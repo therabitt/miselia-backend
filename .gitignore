@@ -1,0 +1,89 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# File    : .gitignore
+# Desc    : Backend gitignore — Python/FastAPI/Celery.
+# Step    : STEP 3 — Backend Setup
+# Ref     : Blueprint Appendix J.1
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.coveragerc
+coverage.xml
+*.cover
+
+# Alembic — jangan ignore migration files
+# alembic/versions/*.py ← JANGAN di-ignore
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Logs
+*.log
+logs/
+celery_logs/
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.test
+# Yang BOLEH di-commit:
+# .env.example
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Profiling
+*.prof
+
+# WeasyPrint cache
+.weasyprint/

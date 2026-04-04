@@ -1,0 +1,106 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# File    : docker-compose.yml
+# Desc    : Local development stack — API + Worker + Beat + Redis + PostgreSQL.
+#           Untuk production deployment, gunakan Railway (backend) — bukan compose.
+# Step    : STEP 3 — Backend Setup
+# Ref     : Blueprint §2.1, Project Master Document Fase 0
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: miselia-postgres
+    environment:
+      POSTGRES_DB: miselia_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d miselia_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: miselia-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI API ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: api
+    container_name: miselia-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/miselia_dev
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  # ── Celery Worker ─────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      target: worker
+    container_name: miselia-worker
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/miselia_dev
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    restart: unless-stopped
+
+  # ── Celery Beat (scheduler) ───────────────────────────────────────────
+  beat:
+    build:
+      context: .
+      target: worker
+    container_name: miselia-beat
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/miselia_dev
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - worker
+    volumes:
+      - .:/app
+    command: celery -A app.workers.celery_app beat --loglevel=info --scheduler celery.beat.PersistentScheduler
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
