@@ -87,3 +87,12 @@ dmypy.json
 
 # WeasyPrint cache
 .weasyprint/
+
+# tmp
+.claude/
+
+# Docs
+docs/
+context/
+
+

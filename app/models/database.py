@@ -36,7 +36,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
-    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
@@ -144,7 +143,8 @@ class User(Base):
     field_of_study          = Column(String(255), nullable=True)
     education_level         = Column(String(10), nullable=True)  # 's1'|'s2'|'s3'
     email_verified          = Column(Boolean, default=False, server_default="false", nullable=False)
-    # onboarding_step: 0=belum mulai, 1–4=progress, 5=completed
+    # [FIX] onboarding_step: 0=belum mulai, 1–3=progress, 4=completed
+    # Range 0–4 sesuai SKILL.md §11 dan Blueprint §11.15 (Screen 0–4, 5 screens total)
     # Ref: Blueprint §6.1, §11.15 (onboarding 5 screen)
     onboarding_step         = Column(Integer, default=0, server_default="0", nullable=False)
     onboarding_completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -167,12 +167,12 @@ class User(Base):
     referral_codes          = relationship("ReferralCode", back_populates="user")
     import_batches          = relationship("ImportBatch", back_populates="user")
     search_sessions: Mapped[list["SearchSession"]] = relationship(
-        "SearchSession", back_populates="user", order_by="SearchSession.created_at.desc()"
-)
+        "SearchSession", back_populates="user", order_by="SearchSession.created_at desc"  # [FIX] SQL-style string, bukan Python expr
+    )
 
 
     def __repr__(self) -> str:
-        return f"<User email={self.email!r} tier=?>"
+        return f"<User email={self.email!r}>"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -442,6 +442,7 @@ class StageOutput(Base):
     diagram_path: PNG statis di R2 untuk export user (P4) — [M1 FIX] BERBEDA dari diagram_data
     prisma_path: SVG PRISMA flowchart untuk P7
     diagram_data: JSONB live {nodes, edges} untuk React Flow — ditambahkan via Migration 027 (Fase 6B)
+    metadata: JSONB untuk monitoring data — termasuk provider_used (Decision #23)
     Ref: Blueprint §6.7
     """
     __tablename__ = "stage_outputs"
@@ -464,6 +465,10 @@ class StageOutput(Base):
     # diagram_data: AKAN ditambahkan via Migration 027 (Fase 6B) — Decision #26
     # ALTER TABLE stage_outputs ADD COLUMN diagram_data JSONB;
     # Tidak didefinisikan di sini — akan di-add saat Fase 6B
+    # [ADD] monitoring_metadata: monitoring data per run — provider_used, token_counts, latency_ms, etc.
+    # Decision #23: provider_used disimpan di sini (bukan di output_data) untuk query-friendly monitoring
+    # Contoh: {"provider_used": "anthropic", "model": "claude-haiku-4-5", "latency_ms": 1240}
+    monitoring_metadata   = Column(JSONB, nullable=True)
     prompt_version_id     = Column(
         UUID(as_uuid=True), ForeignKey("prompt_versions.id"), nullable=True
     )
@@ -676,14 +681,14 @@ class Paper(Base):
     """
     __tablename__ = "papers"
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
-    )
+    # [FIX] Ganti raw Column+text() ke _uuid_pk() — konsisten dengan semua model lain
+    # dan pastikan Python-side default=uuid.uuid4 ada (sebelumnya None sebelum DB flush)
+    id = _uuid_pk()
     # External IDs — unique per source, nullable (tidak semua paper ada di semua source)
     semantic_scholar_id   = Column(String(255), unique=True, nullable=True)
     openalex_id           = Column(String(255), unique=True, nullable=True)
+    # [FIX] garuda_id dipertahankan untuk forward-compatibility — Decision #27: defer SINTA/Garuda
+    # integration. Kolom ini TIDAK aktif digunakan sampai Decision #27 di-revisit.
     garuda_id             = Column(String(255), unique=True, nullable=True)
     # Core metadata
     title                 = Column(Text, nullable=False)
@@ -705,21 +710,15 @@ class Paper(Base):
     # is_manually_imported: TRUE = dari import file user — Decision #28
     is_manually_imported = Column(
         Boolean,
+        default=False,                  # [FIX] tambah Python-side default
         server_default="false",
         nullable=False,
         comment="TRUE = dari import file user (Decision #28)",
     )
-    # Timestamps
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=text("NOW()"),
-        nullable=False,
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=text("NOW()"),
-        nullable=False,
-    )
+    # [FIX] Ganti raw text("NOW()") ke helpers — Paper.updated_at sebelumnya
+    # tidak punya onupdate=func.now() sehingga ORM update tidak auto-update kolom ini
+    created_at = _now_col()
+    updated_at = _updated_at_col()
     # Relationships
     search_results: Mapped[list["SearchResult"]] = relationship(
         "SearchResult", back_populates="paper"
@@ -727,7 +726,8 @@ class Paper(Base):
     library_papers = relationship("LibraryPaper", back_populates="paper")
 
     def __repr__(self) -> str:
-        return f"<Paper title={self.title[:40]!r}>"
+        title_preview = (self.title[:40] + "...") if self.title and len(self.title) > 40 else (self.title or "N/A")
+        return f"<Paper title={title_preview!r}>"
 
 
 # ── SearchResult (Migration 008) ─────────────────────────────────────────
@@ -754,11 +754,8 @@ class SearchResult(Base):
         Index("idx_search_results_paper_id", "paper_id"),
     )
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
-    )
+    # [FIX] Ganti raw Column+text() ke _uuid_pk() — Python-side default=uuid.uuid4 kini ada
+    id = _uuid_pk()
     # NULLABLE — NULL untuk library push_to_project (tidak ada pipeline run).
     # Ref: GAP F1-3
     stage_run_id        = Column(
@@ -775,11 +772,9 @@ class SearchResult(Base):
     relevance_score     = Column(Float, nullable=True)
     rank_position       = Column(Integer, nullable=True)
     included_in_output  = Column(Boolean, default=False, server_default="false", nullable=False)
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=text("NOW()"),
-        nullable=False,
-    )
+    # [FIX] Ganti raw text("NOW()") ke _now_col()
+    # append-only — no updated_at (SearchResult tidak pernah di-update setelah insert)
+    created_at          = _now_col()
 
     # Relationships
     stage_run = relationship("StageRun", back_populates="search_results")
@@ -808,11 +803,8 @@ class SearchSession(Base):
         Index("idx_search_sessions_user_created", "user_id", "created_at"),
     )
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
-    )
+    # [FIX] Ganti raw Column+text() ke _uuid_pk() — Python-side default=uuid.uuid4 kini ada
+    id = _uuid_pk()
     # NOT NULL — guest sessions tidak disimpan
     user_id = Column(
         UUID(as_uuid=True),
@@ -826,11 +818,9 @@ class SearchSession(Base):
     # tanpa cascade ke session history
     paper_ids    = Column(JSONB, nullable=True)
     result_count = Column(Integer, default=0, server_default="0", nullable=False)
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=text("NOW()"),
-        nullable=False,
-    )
+    # [FIX] Ganti raw text("NOW()") ke _now_col()
+    # append-only — no updated_at (SearchSession tidak pernah di-update setelah insert)
+    created_at   = _now_col()
     # Relationships
     user = relationship("User", back_populates="search_sessions")
 
