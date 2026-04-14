@@ -1,6 +1,6 @@
 # Miselia Frontend
 
-Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
+Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui  # noqa: E999
 
 ## Status
 

@@ -465,10 +465,10 @@ class StageOutput(Base):
     # diagram_data: AKAN ditambahkan via Migration 027 (Fase 6B) — Decision #26
     # ALTER TABLE stage_outputs ADD COLUMN diagram_data JSONB;
     # Tidak didefinisikan di sini — akan di-add saat Fase 6B
-    # [ADD] monitoring_metadata: monitoring data per run — provider_used, token_counts, latency_ms, etc.
+    # [ADD] metadata: monitoring data per run — provider_used, token_counts, latency_ms, etc.
     # Decision #23: provider_used disimpan di sini (bukan di output_data) untuk query-friendly monitoring
     # Contoh: {"provider_used": "anthropic", "model": "claude-haiku-4-5", "latency_ms": 1240}
-    monitoring_metadata   = Column(JSONB, nullable=True)
+    metadata              = Column(JSONB, nullable=True)
     prompt_version_id     = Column(
         UUID(as_uuid=True), ForeignKey("prompt_versions.id"), nullable=True
     )
