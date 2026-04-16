@@ -468,7 +468,7 @@ class StageOutput(Base):
     # [ADD] metadata: monitoring data per run — provider_used, token_counts, latency_ms, etc.
     # Decision #23: provider_used disimpan di sini (bukan di output_data) untuk query-friendly monitoring
     # Contoh: {"provider_used": "anthropic", "model": "claude-haiku-4-5", "latency_ms": 1240}
-    metadata              = Column(JSONB, nullable=True)
+    monitoring_metadata   = Column(JSONB, nullable=True)
     prompt_version_id     = Column(
         UUID(as_uuid=True), ForeignKey("prompt_versions.id"), nullable=True
     )

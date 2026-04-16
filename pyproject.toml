@@ -1,0 +1,124 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# File    : pyproject.toml
+# Desc    : Konfigurasi terpadu untuk semua Python dev tools:
+#           pytest, pytest-asyncio, ruff, mypy, black.
+#           Single source of truth untuk tool config — tidak perlu
+#           pytest.ini, setup.cfg, atau .ruff.toml terpisah.
+# Step    : STEP 8 — Backend: Testing Setup
+# Ref     : Project Master Document Fase 0
+# ═══════════════════════════════════════════════════════════════════════════
+
+[tool.pytest.ini_options]
+# asyncio_mode = "auto": semua test async tidak perlu @pytest.mark.asyncio eksplisit
+# Dibutuhkan karena FastAPI endpoints dan SQLAlchemy async session menggunakan async/await
+asyncio_mode = "auto"
+
+# Test discovery
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Output
+addopts = [
+    "--strict-markers",    # Raise error jika ada marker tidak terdaftar
+    "--tb=short",          # Short traceback untuk output bersih
+    "-q",                  # Quiet mode (lebih bersih, detail tetap muncul saat gagal)
+]
+
+# Custom markers — daftarkan agar tidak muncul warning "unknown marker"
+markers = [
+    "unit: Unit tests — tidak butuh koneksi DB atau eksternal services",
+    "integration: Integration tests — butuh DB PostgreSQL berjalan",
+    "slow: Test yang memakan waktu > 5 detik",
+    "pipeline: Test khusus pipeline P1–P8",
+    "subscription: Test khusus subscription lifecycle",
+]
+
+# Environment variables untuk test — override .env
+env = [
+    "APP_ENV=test",
+    "SENTRY_DSN=",          # Disable Sentry di test
+    "AI_FALLBACK_ENABLED=false",  # Disable AI fallback di test
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Ruff — linter & formatter (menggantikan flake8, isort, pyupgrade)
+# ═══════════════════════════════════════════════════════════════════════════
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long — black handles this
+    "B008",   # do not perform function calls in default arguments
+              # (FastAPI Depends() pattern intentionally uses this)
+    "N805",   # first argument of a method should be named 'self'
+              # (Pydantic validators use 'cls')
+    "UP007",  # Use `X | Y` for type annotations — optional, keep Optional for clarity
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "scripts", "tests"]
+force-single-line = false
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Black — code formatter
+# ═══════════════════════════════════════════════════════════════════════════
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+include = '\.pyi?$'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MyPy — static type checker
+# ═══════════════════════════════════════════════════════════════════════════
+
+[tool.mypy]
+python_version = "3.12"
+strict = false          # Tidak full strict untuk sekarang — terlalu verbose di awal
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+
+# Ignore missing stubs untuk library third-party yang belum punya stubs
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "kombu.*",
+    "structlog.*",
+    "sentry_sdk.*",
+    "midtransclient.*",
+    "resend.*",
+    "weasyprint.*",
+    "cairosvg.*",
+    "google.generativeai.*",
+    "jose.*",
+]
+ignore_missing_imports = true

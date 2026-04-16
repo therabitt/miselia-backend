@@ -56,6 +56,10 @@ def upgrade() -> None:
         sa.Column("diagram_path", sa.Text(), nullable=True),
         # prisma_path: SVG PRISMA flowchart P7 — di-embed ke DOCX via cairosvg
         sa.Column("prisma_path", sa.Text(), nullable=True),
+        # monitoring_metadata: JSONB untuk data monitoring per run — provider_used, token_counts, dll.
+        # Decision #23: provider_used disimpan di sini (bukan di output_data) untuk query-friendly monitoring
+        # Contoh: {"provider_used": "anthropic", "model": "claude-haiku-4-5", "latency_ms": 1240}
+        sa.Column("monitoring_metadata", postgresql.JSONB(), nullable=True),
         # prompt_version_id: FK ditambahkan nanti oleh migration 015
         # karena tabel prompt_versions belum exist saat ini
         sa.Column(
