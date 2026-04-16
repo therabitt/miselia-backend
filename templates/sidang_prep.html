@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<!--
+  ═════════════════════════════════════════════════════════════════════════════
+  File    : templates/sidang_prep.html
+  Desc    : HTML template untuk WeasyPrint PDF generation (Pipeline P8 — Sidang Preparation).
+            PLACEHOLDER — implementasi penuh di Fase Tier B.
+
+            Template ini digunakan oleh pdf_service.py:
+              WeasyPrint.HTML(string=rendered_html).write_pdf()
+
+            Saat implementasi, variabel Jinja2 berikut akan di-inject:
+              {{ user.full_name }}          — nama mahasiswa
+              {{ project.title }}           — judul/topik penelitian
+              {{ project.field_of_study }}  — program studi
+              {{ generated_at }}            — tanggal generate (DD MMMM YYYY)
+              {{ predicted_questions }}     — list pertanyaan penguji + jawaban
+              {{ weaknesses }}              — list kelemahan penelitian + mitigasi
+              {{ slide_structure }}         — list 12–15 slide dengan konten per slide
+              {{ key_terms }}               — glossary istilah teknis wajib
+
+            Output: PDF tanpa watermark untuk semua tier berbayar (Decision #20)
+            Ref: Blueprint §9.8, Decision #20, §2.2 pdf_service.py
+  ═════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panduan Sidang — Miselia</title>
+  <style>
+    /* ── Page Setup ─────────────────────────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 2.5cm 2.5cm 2.5cm 2.5cm;
+      @bottom-center {
+        content: "Halaman " counter(page) " dari " counter(pages);
+        font-size: 10px;
+        color: #888;
+      }
+    }
+
+    /* ── Base Typography ────────────────────────────────────────────────── */
+    body {
+      font-family: "Liberation Serif", "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #1a1a1a;
+    }
+
+    h1 {
+      font-size: 18pt;
+      font-weight: bold;
+      color: #1B2A4A;
+      text-align: center;
+      margin-bottom: 0.5em;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: bold;
+      color: #1B2A4A;
+      border-bottom: 1.5px solid #1B2A4A;
+      padding-bottom: 4px;
+      margin-top: 1.5em;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      font-size: 12pt;
+      font-weight: bold;
+      color: #2D4A7A;
+      margin-top: 1em;
+      page-break-after: avoid;
+    }
+
+    /* ── Header / Cover ─────────────────────────────────────────────────── */
+    .cover {
+      text-align: center;
+      margin-bottom: 2em;
+      padding-bottom: 1em;
+      border-bottom: 2px solid #1B2A4A;
+    }
+
+    .cover .subtitle {
+      font-size: 11pt;
+      color: #555;
+      margin-top: 0.3em;
+    }
+
+    .cover .meta {
+      font-size: 10pt;
+      color: #888;
+      margin-top: 1em;
+    }
+
+    /* ── Disclaimer Banner ───────────────────────────────────────────────── */
+    .disclaimer {
+      background: #FFF3CD;
+      border: 1px solid #FFCA2C;
+      border-left: 4px solid #FFCA2C;
+      padding: 0.75em 1em;
+      margin: 1em 0;
+      font-size: 10pt;
+      color: #664D03;
+      border-radius: 4px;
+    }
+
+    /* ── Question Cards ─────────────────────────────────────────────────── */
+    .question-card {
+      border: 1px solid #D0D7E2;
+      border-radius: 4px;
+      padding: 0.75em 1em;
+      margin-bottom: 1em;
+      page-break-inside: avoid;
+    }
+
+    .question-card .label {
+      font-size: 9pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #666;
+      margin-bottom: 0.3em;
+    }
+
+    .question-card.sangat-mungkin { border-left: 4px solid #DC3545; }
+    .question-card.mungkin { border-left: 4px solid #FFC107; }
+    .question-card.bisa-jadi { border-left: 4px solid #6C757D; }
+
+    .question-text {
+      font-weight: bold;
+      margin-bottom: 0.5em;
+    }
+
+    .answer-points {
+      margin: 0;
+      padding-left: 1.5em;
+    }
+
+    .answer-points li {
+      margin-bottom: 0.3em;
+    }
+
+    /* ── Weakness Cards ──────────────────────────────────────────────────── */
+    .weakness-card {
+      background: #F8F9FA;
+      border: 1px solid #DEE2E6;
+      border-radius: 4px;
+      padding: 0.75em 1em;
+      margin-bottom: 0.8em;
+      page-break-inside: avoid;
+    }
+
+    .severity-tinggi { border-left: 4px solid #DC3545; }
+    .severity-sedang { border-left: 4px solid #FFC107; }
+    .severity-rendah { border-left: 4px solid #28A745; }
+
+    /* ── Slide Structure ─────────────────────────────────────────────────── */
+    .slide-item {
+      display: flex;
+      margin-bottom: 0.6em;
+      page-break-inside: avoid;
+    }
+
+    .slide-number {
+      font-weight: bold;
+      min-width: 2.5em;
+      color: #1B2A4A;
+    }
+
+    /* ── Glossary Table ──────────────────────────────────────────────────── */
+    table.glossary {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5em;
+      font-size: 11pt;
+    }
+
+    table.glossary th {
+      background: #1B2A4A;
+      color: white;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: bold;
+    }
+
+    table.glossary td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #DEE2E6;
+      vertical-align: top;
+    }
+
+    table.glossary tr:nth-child(even) td {
+      background: #F8F9FA;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .doc-footer {
+      margin-top: 2em;
+      padding-top: 1em;
+      border-top: 1px solid #DEE2E6;
+      font-size: 9pt;
+      color: #888;
+      text-align: center;
+    }
+
+    /* ── Page breaks ─────────────────────────────────────────────────────── */
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Cover ──────────────────────────────────────────────────────────── -->
+  <div class="cover">
+    <h1>Panduan Persiapan Sidang</h1>
+    <div class="subtitle">
+      <!-- {{ project.title }} -->
+      [PLACEHOLDER: Judul Penelitian]
+    </div>
+    <div class="meta">
+      <!-- {{ user.full_name }} · {{ project.field_of_study }} -->
+      [PLACEHOLDER: Nama Mahasiswa] · [PLACEHOLDER: Program Studi]<br/>
+      <!-- Dihasilkan oleh Miselia pada {{ generated_at }} -->
+      Dihasilkan oleh Miselia (miselia.id) · [PLACEHOLDER: Tanggal]
+    </div>
+  </div>
+
+  <!-- ── Disclaimer ─────────────────────────────────────────────────────── -->
+  <div class="disclaimer">
+    <strong>Penting:</strong> Dokumen ini adalah panduan persiapan yang dihasilkan oleh AI
+    berdasarkan output pipeline penelitianmu. Gunakan sebagai titik awal — validasi setiap
+    prediksi pertanyaan dengan pembimbing dan penguji yang relevan.
+    Miselia tidak bertanggung jawab atas keakuratan prediksi pertanyaan sidang.
+  </div>
+
+  <!-- ── Section 1: Predicted Questions ────────────────────────────────── -->
+  <h2>1. Prediksi Pertanyaan Penguji</h2>
+
+  <h3>Sangat Mungkin Ditanyakan</h3>
+  <!-- Loop: {{ predicted_questions | selectattr('category', '==', 'SANGAT MUNGKIN') }} -->
+  <div class="question-card sangat-mungkin">
+    <div class="label">Sangat Mungkin · Metodologi</div>
+    <div class="question-text">[PLACEHOLDER: Pertanyaan penguji]</div>
+    <ul class="answer-points">
+      <li>[PLACEHOLDER: Poin jawaban 1]</li>
+      <li>[PLACEHOLDER: Poin jawaban 2]</li>
+      <li>[PLACEHOLDER: Poin jawaban 3]</li>
+    </ul>
+  </div>
+
+  <h3>Mungkin Ditanyakan</h3>
+  <!-- Loop: {{ predicted_questions | selectattr('category', '==', 'MUNGKIN') }} -->
+  <div class="question-card mungkin">
+    <div class="label">Mungkin · Novelty</div>
+    <div class="question-text">[PLACEHOLDER: Pertanyaan penguji]</div>
+    <ul class="answer-points">
+      <li>[PLACEHOLDER: Poin jawaban 1]</li>
+      <li>[PLACEHOLDER: Poin jawaban 2]</li>
+    </ul>
+  </div>
+
+  <h3>Bisa Jadi Ditanyakan</h3>
+  <!-- Loop: {{ predicted_questions | selectattr('category', '==', 'BISA JADI') }} -->
+  <div class="question-card bisa-jadi">
+    <div class="label">Bisa Jadi · Kontekstual</div>
+    <div class="question-text">[PLACEHOLDER: Pertanyaan penguji]</div>
+    <ul class="answer-points">
+      <li>[PLACEHOLDER: Poin jawaban 1]</li>
+    </ul>
+  </div>
+
+  <!-- ── Section 2: Weaknesses ──────────────────────────────────────────── -->
+  <div class="page-break"></div>
+  <h2>2. Kelemahan Penelitian &amp; Mitigasi</h2>
+  <p>Kelemahan berikut diidentifikasi berdasarkan output pipeline penelitianmu.
+  Persiapkan argumen untuk menjawab pertanyaan terkait setiap kelemahan.</p>
+
+  <!-- Loop: {{ weaknesses }} -->
+  <div class="weakness-card severity-tinggi">
+    <h3>[PLACEHOLDER: Kategori Kelemahan]</h3>
+    <p>[PLACEHOLDER: Deskripsi kelemahan]</p>
+    <p><strong>Cara merespons:</strong> [PLACEHOLDER: Strategi mitigasi]</p>
+  </div>
+
+  <!-- ── Section 3: Slide Structure ────────────────────────────────────── -->
+  <div class="page-break"></div>
+  <h2>3. Struktur Slide Presentasi (12–15 Slide)</h2>
+  <p>Rekomendasi struktur slide untuk presentasi sidang.
+  Sesuaikan dengan panduan dari institusi dan pembimbing.</p>
+
+  <!-- Loop: {{ slide_structure }} -->
+  <div class="slide-item">
+    <span class="slide-number">Slide 1</span>
+    <span>[PLACEHOLDER: Judul slide — konten yang disarankan]</span>
+  </div>
+  <div class="slide-item">
+    <span class="slide-number">Slide 2</span>
+    <span>[PLACEHOLDER: Latar Belakang &amp; Rumusan Masalah]</span>
+  </div>
+  <div class="slide-item">
+    <span class="slide-number">Slide 3–N</span>
+    <span>[PLACEHOLDER: ...]</span>
+  </div>
+
+  <!-- ── Section 4: Key Terms Glossary ──────────────────────────────────── -->
+  <div class="page-break"></div>
+  <h2>4. Glossary Istilah Teknis</h2>
+  <p>Istilah-istilah berikut perlu dikuasai untuk menjawab pertanyaan penguji
+  dengan percaya diri.</p>
+
+  <table class="glossary">
+    <thead>
+      <tr>
+        <th style="width: 30%">Istilah</th>
+        <th>Definisi &amp; Konteks dalam Penelitianmu</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Loop: {{ key_terms }} -->
+      <tr>
+        <td><strong>[PLACEHOLDER: Istilah]</strong></td>
+        <td>[PLACEHOLDER: Definisi dan relevansi dengan penelitianmu]</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ── Document Footer ────────────────────────────────────────────────── -->
+  <div class="doc-footer">
+    Dihasilkan oleh Miselia (miselia.id) ·
+    Dokumen ini adalah titik awal persiapan — verifikasi dengan pembimbing sebelum sidang.
+  </div>
+
+</body>
+</html>

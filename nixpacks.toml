@@ -1,0 +1,29 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# File    : nixpacks.toml
+# Desc    : Konfigurasi Nixpacks untuk Railway — ALTERNATIF dari Dockerfile.
+#           Railway menggunakan Dockerfile jika ada. File ini didokumentasikan
+#           sebagai referensi jika Dockerfile perlu diganti ke Nixpacks.
+#           Ref: Blueprint §16.4
+#
+#           CARA PAKAI (jika beralih ke Nixpacks):
+#           1. Rename atau hapus Dockerfile
+#           2. Railway akan auto-detect nixpacks.toml ini
+#           3. nixPkgs berikut menginstall dependency WeasyPrint + cairosvg
+#
+# Step    : STEP 9 — Backend: Dockerfile
+# Ref     : Blueprint §16.4
+# ═════════════════════════════════════════════════════════════════════════════
+
+[phases.setup]
+# Nix packages yang setara dengan apt-get packages di Dockerfile
+# pango   = libpango-1.0-0 + libpangoft2 + libpangocairo
+# cairo   = libcairo2
+# gdk-pixbuf = libgdk-pixbuf2.0-0
+# libffi  = libffi-dev
+nixPkgs = ["pango", "cairo", "gdk-pixbuf", "libffi", "fontconfig"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"

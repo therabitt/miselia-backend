@@ -1,0 +1,70 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# File    : .dockerignore
+# Desc    : Files yang dikecualikan dari Docker build context.
+#           Meminimalkan build context untuk mempercepat build Railway.
+# Step    : STEP 9 — Backend: Dockerfile
+# Ref     : Blueprint §2.2
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment — JANGAN masuk ke image, pip install dari requirements.txt
+.venv
+venv/
+env/
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+
+# Development config
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Alembic — versions HARUS masuk (migration dijalankan saat startup)
+# Jangan ignore alembic/ secara keseluruhan
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/
+celery_logs/
+
+# WeasyPrint cache
+.weasyprint/
+
+# Celery beat schedule
+celerybeat-schedule
+celerybeat.pid
+
+# Profiling
+*.prof
+
+# Dokumentasi
+*.md
+!requirements*.txt
