@@ -30,7 +30,6 @@ log = get_logger(__name__)
 
 # ── Sentry ────────────────────────────────────────────────────────────────
 
-
 def _sentry_before_send(
     event: dict[str, Any],
     hint: dict[str, Any],
@@ -75,48 +74,57 @@ def _init_sentry() -> None:
 
     sentry_sdk.init(
         dsn=dsn,
+
         # ── Environment tagging ────────────────────────────────────────────
-        environment=settings.APP_ENV,  # "development" | "staging" | "production"
+        environment=settings.APP_ENV,       # "development" | "staging" | "production"
         release="miselia-backend@0.1.0",
+
         # ── Integrations ──────────────────────────────────────────────────
         integrations=[
             # FastAPI: capture request context, path params, user info
             FastApiIntegration(
-                transaction_style="endpoint",  # Group by endpoint, bukan URL path
+                transaction_style="endpoint",   # Group by endpoint, not URL path
             ),
             # SQLAlchemy: capture slow queries dan query errors
             SqlalchemyIntegration(),
             # Celery: capture task failures dengan full context
             CeleryIntegration(
-                monitor_beat_tasks=True,  # Monitor Beat job failures
-                propagate_traces=True,  # Trace dari API ke Celery task
+                monitor_beat_tasks=True,        # Monitor Beat job failures
+                propagate_traces=True,          # Trace dari API ke Celery task
             ),
             # Redis: capture Redis connection errors
             RedisIntegration(),
             # Logging: capture WARNING+ dari Python logger
             LoggingIntegration(
-                level=logging.WARNING,  # Capture WARNING sebagai breadcrumb
-                event_level=logging.ERROR,  # Kirim ERROR sebagai Sentry event
+                level=logging.WARNING,          # Capture WARNING sebagai breadcrumb
+                event_level=logging.ERROR,      # Kirim ERROR sebagai Sentry event
             ),
         ],
+
         # ── Performance tracing ───────────────────────────────────────────
         # 10% di production — cukup untuk profiling tanpa overhead tinggi
         # 100% di development untuk debugging
         traces_sample_rate=0.1 if settings.is_production else 1.0,
+
         # ── Profiling ─────────────────────────────────────────────────────
         # Aktif hanya di production (butuh Sentry Performance plan)
         profiles_sample_rate=0.1 if settings.is_production else 0.0,
+
         # ── Filter & scrubbing ────────────────────────────────────────────
         before_send=_sentry_before_send,
-        send_default_pii=False,  # Jangan kirim IP, email, username otomatis
+        send_default_pii=False,             # Jangan kirim IP, email, username otomatis
+
+        # ── Error filtering ───────────────────────────────────────────────
+        # Jangan log 404 dan 405 sebagai error — terlalu banyak noise
+        ignore_errors=[],
+
         # ── Timeout ───────────────────────────────────────────────────────
-        shutdown_timeout=5,  # Flush pending events saat shutdown
+        shutdown_timeout=5,                 # Flush pending events saat shutdown
     )
-    log.info("Sentry initialized", env=settings.APP_ENV)
+    log.info("Sentry initialized", dsn_set=bool(settings.SENTRY_DSN), env=settings.APP_ENV)
 
 
 # ── App lifespan ──────────────────────────────────────────────────────────
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -157,7 +165,6 @@ app.add_middleware(
 
 
 # ── Exception handlers ────────────────────────────────────────────────────
-
 
 @app.exception_handler(MiseliaBaseException)
 async def miselia_exception_handler(
@@ -207,7 +214,6 @@ app.include_router(api_router, prefix="/api/v1")
 
 
 # ── Root ──────────────────────────────────────────────────────────────────
-
 
 @app.get("/", include_in_schema=False)
 async def root() -> dict:
