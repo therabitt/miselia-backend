@@ -1,0 +1,136 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# File    : .github/workflows/deploy.yml
+# Desc    : Backend deploy ke Railway staging.
+#           Trigger: push ke branch main setelah CI lulus.
+#           Mendeploy tiga Railway services sekaligus:
+#             - miselia-api     : FastAPI + uvicorn
+#             - miselia-worker  : Celery pipeline worker
+#             - miselia-beat    : Celery Beat scheduler
+#           Railway deploy via CLI (railway up) dengan service-specific config.
+#
+#           SECRETS yang dibutuhkan di GitHub repository settings:
+#             RAILWAY_TOKEN      : Railway API token (dari Railway dashboard)
+#             RAILWAY_PROJECT_ID : Railway project ID
+#             RAILWAY_SERVICE_API    : Service ID untuk API service
+#             RAILWAY_SERVICE_WORKER : Service ID untuk Worker service
+#             RAILWAY_SERVICE_BEAT   : Service ID untuk Beat service
+#
+# Layer   : DevOps / Deploy
+# Step    : STEP 13 — GitHub Actions
+# Ref     : Blueprint §15.2, Project Master Document Fase 0
+# ═════════════════════════════════════════════════════════════════════════════
+
+name: Backend Deploy — Railway Staging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "miselia-backend/**"
+      - ".github/workflows/deploy.yml"
+  # Bisa juga trigger manual dari GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deploy target"
+        required: true
+        default: "staging"
+        type: choice
+        options: [staging, production]
+
+# Pastikan tidak ada dua deploy berjalan bersamaan
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: false  # Jangan cancel deploy yang sedang berjalan
+
+defaults:
+  run:
+    working-directory: miselia-backend
+
+jobs:
+  # ── Gate: CI harus lulus dulu ─────────────────────────────────────────────
+  check-ci:
+    name: Verify CI passed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI status
+        run: echo "CI gate passed — proceeding to deploy"
+
+  # ── Deploy ────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: check-ci
+    timeout-minutes: 20
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: https://miselia-api-staging.railway.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          railway --version
+
+      - name: Deploy API service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_API }} \
+            --detach \
+            --no-gitignore
+          echo "✓ API service deploy triggered"
+
+      - name: Deploy Worker service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_WORKER }} \
+            --detach \
+            --no-gitignore
+          echo "✓ Worker service deploy triggered"
+
+      - name: Deploy Beat service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_BEAT }} \
+            --detach \
+            --no-gitignore
+          echo "✓ Beat service deploy triggered"
+
+      - name: Wait for API health check
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Waiting 30s for service startup..."
+          sleep 30
+          # Health check — retry 5x dengan interval 15 detik
+          for i in $(seq 1 5); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              https://miselia-api-staging.railway.app/api/v1/health \
+              --max-time 10 || echo "000")
+            echo "  Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Health check passed"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "✗ Health check failed after 5 attempts"
+          exit 1
+
+      - name: Notify deploy status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "🚀 Deploy berhasil — staging environment updated"
+          else
+            echo "❌ Deploy gagal — periksa Railway dashboard"
+          fi

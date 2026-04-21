@@ -1,0 +1,148 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# File    : .github/workflows/ci.yml
+# Desc    : Backend CI pipeline — ruff lint, mypy type check, pytest.
+#           Trigger: push/PR ke branch main dan staging.
+#           Python: 3.12, dependencies dari requirements.txt +
+#           requirements-dev.txt.
+#           Test DB: PostgreSQL 16 service container (sesuai STEP 8 konfig).
+# Layer   : DevOps / CI
+# Step    : STEP 13 — GitHub Actions
+# Ref     : Project Master Document Fase 0
+# ═════════════════════════════════════════════════════════════════════════════
+
+name: Backend CI
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      # Hanya trigger jika ada perubahan di backend
+      - "miselia-backend/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main, staging]
+    paths:
+      - "miselia-backend/**"
+      - ".github/workflows/ci.yml"
+
+defaults:
+  run:
+    working-directory: miselia-backend
+
+jobs:
+  # ── Job 1: Lint & Type Check ─────────────────────────────────────────────
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: miselia-backend/requirements*.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check . --output-format=github
+        # --output-format=github: format error agar muncul sebagai annotation di PR
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: MyPy type check
+        run: mypy app/ --ignore-missing-imports
+        # Hanya check app/ — skip scripts/ dan tests/ untuk sekarang
+        continue-on-error: true
+        # continue-on-error: true untuk fase awal — jangan block merge karena mypy
+        # Set false saat codebase sudah lebih mature (Fase 3+)
+
+  # ── Job 2: Test ───────────────────────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint
+
+    # PostgreSQL service container — sesuai strategi STEP 8 (Opsi A)
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: miselia_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: miselia-backend/requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        env:
+          # App config
+          APP_ENV: test
+          APP_SECRET_KEY: ci-test-secret-key-not-for-production
+          # Database — test DB di service container
+          DATABASE_URL: postgresql+asyncpg://postgres:testpassword@localhost:5432/miselia_test
+          DATABASE_URL_TEST: postgresql+asyncpg://postgres:testpassword@localhost:5432/miselia_test
+          # Supabase — mock values untuk CI (tidak ada koneksi nyata di test)
+          SUPABASE_URL: https://mock.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: mock-service-role-key
+          SUPABASE_JWT_SECRET: mock-jwt-secret-for-ci-only
+          # Redis
+          REDIS_URL: redis://localhost:6379/0
+          # Disable semua external services di CI
+          SENTRY_DSN: ""
+          OPENAI_API_KEY: mock-openai-key
+          AI_FALLBACK_ENABLED: "false"
+        run: |
+          pytest tests/ -v \
+            --tb=short \
+            --no-header \
+            -q
+        # Output yang diharapkan di Fase 0: "no tests ran" — ini OK
+        # Test case diisi di Fase 1+
+
+      - name: Upload coverage (jika ada)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: miselia-backend/htmlcov/
+          if-no-files-found: ignore
