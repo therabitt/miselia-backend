@@ -27,8 +27,9 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 from alembic import op
 
 revision: str = "024"
@@ -45,9 +46,9 @@ def upgrade() -> None:
     # Path resolution: alembic dijalankan dari root miselia-backend/
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
     from scripts.seed_db import (
-        seed_prompt_versions,
-        seed_feature_flags,
         seed_citation_style_mappings,
+        seed_feature_flags,
+        seed_prompt_versions,
     )
 
     # Dapatkan raw connection dari alembic migration context
@@ -296,24 +297,24 @@ def upgrade() -> None:
 def downgrade() -> None:
     # ── Drop RLS policies ─────────────────────────────────────────────────
     rls_policies = [
-        ("users",                   "users_select_own"),
-        ("users",                   "users_update_own"),
-        ("users",                   "users_insert_service"),
-        ("subscriptions",           "subscriptions_select_own"),
-        ("subscriptions",           "subscriptions_all_service"),
-        ("projects",                "projects_select_own"),
-        ("projects",                "projects_insert_own"),
-        ("projects",                "projects_update_own"),
-        ("projects",                "projects_all_service"),
-        ("stage_runs",              "stage_runs_select_own"),
-        ("stage_runs",              "stage_runs_insert_own"),
-        ("stage_runs",              "stage_runs_all_service"),
-        ("stage_outputs",           "stage_outputs_select_own"),
-        ("stage_outputs",           "stage_outputs_all_service"),
-        ("payment_transactions",    "payment_transactions_select_own"),
-        ("payment_transactions",    "payment_transactions_all_service"),
-        ("institutional_seats",     "institutional_seats_select_own"),
-        ("institutional_seats",     "institutional_seats_all_service"),
+        ("users", "users_select_own"),
+        ("users", "users_update_own"),
+        ("users", "users_insert_service"),
+        ("subscriptions", "subscriptions_select_own"),
+        ("subscriptions", "subscriptions_all_service"),
+        ("projects", "projects_select_own"),
+        ("projects", "projects_insert_own"),
+        ("projects", "projects_update_own"),
+        ("projects", "projects_all_service"),
+        ("stage_runs", "stage_runs_select_own"),
+        ("stage_runs", "stage_runs_insert_own"),
+        ("stage_runs", "stage_runs_all_service"),
+        ("stage_outputs", "stage_outputs_select_own"),
+        ("stage_outputs", "stage_outputs_all_service"),
+        ("payment_transactions", "payment_transactions_select_own"),
+        ("payment_transactions", "payment_transactions_all_service"),
+        ("institutional_seats", "institutional_seats_select_own"),
+        ("institutional_seats", "institutional_seats_all_service"),
     ]
 
     for table, policy in rls_policies:

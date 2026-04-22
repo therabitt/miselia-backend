@@ -55,17 +55,14 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-
     # Task behavior
-    task_acks_late=True,           # Ack setelah task selesai, bukan saat diterima
+    task_acks_late=True,  # Ack setelah task selesai, bukan saat diterima
     task_reject_on_worker_lost=True,  # Re-queue jika worker crash saat proses
-    task_soft_time_limit=300,      # 5 menit — SoftTimeLimitExceeded
-    task_time_limit=360,           # 6 menit — force kill (Blueprint §2.2 base.py)
+    task_soft_time_limit=300,  # 5 menit — SoftTimeLimitExceeded
+    task_time_limit=360,  # 6 menit — force kill (Blueprint §2.2 base.py)
     worker_prefetch_multiplier=1,  # 1 task per worker untuk menghindari starvation
-
     # Result backend
-    result_expires=3600,           # Hasil task expired setelah 1 jam
-
+    result_expires=3600,  # Hasil task expired setelah 1 jam
     # Broker
     broker_connection_retry_on_startup=True,
     broker_transport_options={
@@ -96,24 +93,24 @@ celery_app.conf.task_default_routing_key = "pipeline_normal"
 
 celery_app.conf.task_routes = {
     # P7 SLR — queue terpisah
-    "app.workers.tasks.run_systematic_review":       {"queue": "pipeline_heavy"},
+    "app.workers.tasks.run_systematic_review": {"queue": "pipeline_heavy"},
     # P1–P6, P8 — queue normal
-    "app.workers.tasks.run_literature_review":       {"queue": "pipeline_normal"},
-    "app.workers.tasks.run_research_gap":            {"queue": "pipeline_normal"},
-    "app.workers.tasks.run_methodology":             {"queue": "pipeline_normal"},
-    "app.workers.tasks.run_hypothesis":              {"queue": "pipeline_normal"},
-    "app.workers.tasks.run_chapter_outline":         {"queue": "pipeline_normal"},
-    "app.workers.tasks.run_bab1_writer":             {"queue": "pipeline_normal"},
-    "app.workers.tasks.run_sidang_prep":             {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_literature_review": {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_research_gap": {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_methodology": {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_hypothesis": {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_chapter_outline": {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_bab1_writer": {"queue": "pipeline_normal"},
+    "app.workers.tasks.run_sidang_prep": {"queue": "pipeline_normal"},
     # Chat — queue realtime
-    "app.workers.tasks.process_chat_message":        {"queue": "chat_realtime"},
+    "app.workers.tasks.process_chat_message": {"queue": "chat_realtime"},
     # Scheduled jobs — maintenance queue
-    "app.workers.scheduled.subscriptions.*":         {"queue": "maintenance"},
-    "app.workers.scheduled.reconciliation.*":        {"queue": "maintenance"},
-    "app.workers.scheduled.intelligence.*":          {"queue": "maintenance"},
-    "app.workers.scheduled.prompt_report.*":         {"queue": "maintenance"},
-    "app.workers.scheduled.citation_review.*":       {"queue": "maintenance"},
-    "app.workers.scheduled.maintenance.*":           {"queue": "maintenance"},
+    "app.workers.scheduled.subscriptions.*": {"queue": "maintenance"},
+    "app.workers.scheduled.reconciliation.*": {"queue": "maintenance"},
+    "app.workers.scheduled.intelligence.*": {"queue": "maintenance"},
+    "app.workers.scheduled.prompt_report.*": {"queue": "maintenance"},
+    "app.workers.scheduled.citation_review.*": {"queue": "maintenance"},
+    "app.workers.scheduled.maintenance.*": {"queue": "maintenance"},
 }
 
 # ── Beat Schedule — Semua scheduled jobs ─────────────────────────────────
@@ -139,7 +136,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=2, minute=0),
         "options": {"queue": "maintenance"},
     },
-
     # ── Reconciliation & Cleanup ──────────────────────────────────────────
     # Setiap 30 menit — cleanup stage_runs status='running' > 10 menit
     "cleanup-orphaned-stage-runs": {
@@ -153,7 +149,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/2"),
         "options": {"queue": "maintenance"},
     },
-
     # ── Library Maintenance ───────────────────────────────────────────────
     # Daily 02:00 WIB (19:00 UTC hari sebelumnya) — hard delete paper expired > 90 hari
     # Ref: Blueprint §2.2 maintenance.py (cleanup_expired_library_papers)
@@ -162,7 +157,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=19, minute=0),
         "options": {"queue": "maintenance"},
     },
-
     # ── Analytics & Partitions ────────────────────────────────────────────
     # Setiap tanggal 1 pukul 00:05 WIB (17:05 UTC, hari sebelumnya) — buat partisi bulan baru
     # KRITIS: analytics_events query FAIL jika tidak ada partisi matching (Blueprint §6.15)
@@ -171,7 +165,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=17, minute=5, day_of_month=1),
         "options": {"queue": "maintenance"},
     },
-
     # ── Intelligence & Reporting ──────────────────────────────────────────
     # Daily 01:30 WIB (18:30 UTC hari sebelumnya) — agregasi metrics harian
     "daily-intelligence-aggregation": {

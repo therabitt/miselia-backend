@@ -17,6 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
@@ -98,10 +99,12 @@ class Settings(BaseSettings):
     def allowed_origins(self) -> list[str]:
         origins = [self.FRONTEND_URL]
         if not self.is_production:
-            origins.extend([
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-            ])
+            origins.extend(
+                [
+                    "http://localhost:3000",
+                    "http://127.0.0.1:3000",
+                ]
+            )
         return origins
 
     @property

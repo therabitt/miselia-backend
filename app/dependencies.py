@@ -62,6 +62,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # ── Auth dependencies ─────────────────────────────────────────────────────
 
+
 async def get_current_user(
     authorization: Optional[str] = Header(default=None),
     db: AsyncSession = Depends(get_db),
@@ -129,9 +130,8 @@ async def _get_user_by_supabase_id(
     Implementasi penuh setelah User model tersedia di STEP 4.
     """
     from sqlalchemy import select
+
     from app.models.database import User
 
-    result = await db.execute(
-        select(User).where(User.supabase_id == uuid.UUID(supabase_id))
-    )
+    result = await db.execute(select(User).where(User.supabase_id == uuid.UUID(supabase_id)))
     return result.scalar_one_or_none()

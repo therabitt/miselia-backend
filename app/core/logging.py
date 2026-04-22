@@ -57,9 +57,7 @@ def configure_logging(is_production: bool = False) -> None:
         level=log_level,
     )
     # Suppress noisy libraries di production
-    logging.getLogger("uvicorn.access").setLevel(
-        logging.WARNING if is_production else logging.INFO
-    )
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING if is_production else logging.INFO)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 

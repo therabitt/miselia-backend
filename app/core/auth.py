@@ -65,6 +65,7 @@ async def get_jwks() -> dict:
 
 # ── JWT Verification ─────────────────────────────────────────────────────
 
+
 async def verify_jwt(token: str) -> dict:
     """
     Verifikasi JWT ES256 dari Supabase Auth.
@@ -108,9 +109,7 @@ async def verify_jwt(token: str) -> dict:
         # Validasi role — hanya 'authenticated' yang valid untuk protected endpoints
         role = payload.get("role", "")
         if role not in ("authenticated", "service_role"):
-            raise UnauthorizedError(
-                message="Token tidak memiliki role yang valid."
-            )
+            raise UnauthorizedError(message="Token tidak memiliki role yang valid.")
 
         return payload
 

@@ -10,8 +10,9 @@
 from typing import Optional
 
 
-class MiseliaBaseException(Exception):
+class MiseliaBaseError(Exception):
     """Base exception semua custom error Miselia."""
+
     status_code: int = 500
     error_code: str = "internal_error"
     message: str = "Terjadi kesalahan internal."
@@ -24,22 +25,26 @@ class MiseliaBaseException(Exception):
 
 # ── Auth & Access ─────────────────────────────────────────────────────────
 
-class UnauthorizedError(MiseliaBaseException):
+
+class UnauthorizedError(MiseliaBaseError):
     """JWT tidak valid atau tidak ada."""
+
     status_code = 401
     error_code = "unauthorized"
     message = "Autentikasi diperlukan."
 
 
-class ForbiddenError(MiseliaBaseException):
+class ForbiddenError(MiseliaBaseError):
     """User tidak punya izin untuk aksi ini."""
+
     status_code = 403
     error_code = "forbidden"
     message = "Akses ditolak."
 
 
-class AdminRequiredError(MiseliaBaseException):
+class AdminRequiredError(MiseliaBaseError):
     """Endpoint ini hanya untuk admin."""
+
     status_code = 403
     error_code = "admin_required"
     message = "Akses admin diperlukan."
@@ -47,36 +52,42 @@ class AdminRequiredError(MiseliaBaseException):
 
 # ── Subscription & Tier ───────────────────────────────────────────────────
 
-class SubscriptionRequired(MiseliaBaseException):
+
+class SubscriptionRequiredError(MiseliaBaseError):
     """Fitur ini membutuhkan subscription aktif."""
+
     status_code = 402
     error_code = "subscription_required"
     message = "Upgrade subscription untuk menggunakan fitur ini."
 
 
-class SubscriptionExpired(MiseliaBaseException):
+class SubscriptionExpiredError(MiseliaBaseError):
     """Subscription sudah expired (melewati grace period)."""
+
     status_code = 402
     error_code = "subscription_expired"
     message = "Subscription kamu sudah berakhir. Perpanjang untuk melanjutkan."
 
 
-class ProjectQuotaExceeded(MiseliaBaseException):
+class ProjectQuotaExceededError(MiseliaBaseError):
     """User sudah mencapai batas project aktif untuk tier-nya."""
+
     status_code = 403
     error_code = "project_quota_exceeded"
     message = "Batas project aktif tercapai. Upgrade atau archive project lama."
 
 
-class StageNotAllowed(MiseliaBaseException):
+class StageNotAllowedError(MiseliaBaseError):
     """Stage type tidak tersedia untuk tier user saat ini."""
+
     status_code = 403
     error_code = "stage_not_allowed"
     message = "Pipeline ini tidak tersedia di tier kamu."
 
 
-class StageRunLimitReached(MiseliaBaseException):
+class StageRunLimitReachedError(MiseliaBaseError):
     """Free tier mencapai batas re-run (3x). Decision #8"""
+
     status_code = 403
     error_code = "stage_run_limit_reached"
     message = "Batas re-run tercapai. Upgrade untuk run tidak terbatas."
@@ -84,22 +95,26 @@ class StageRunLimitReached(MiseliaBaseException):
 
 # ── Pipeline & Stage ──────────────────────────────────────────────────────
 
-class PipelineDependencyError(MiseliaBaseException):
+
+class PipelineDependencyError(MiseliaBaseError):
     """Pipeline dependency belum selesai (contoh: P2 butuh P1 completed)."""
+
     status_code = 422
     error_code = "pipeline_dependency_error"
     message = "Pipeline sebelumnya harus diselesaikan terlebih dahulu."
 
 
-class ReviewTypeMismatch(MiseliaBaseException):
+class ReviewTypeMismatchError(MiseliaBaseError):
     """P7 dijalankan di project non-systematic atau sebaliknya. Decision #19"""
+
     status_code = 422
     error_code = "review_type_mismatch"
     message = "Pipeline ini tidak sesuai dengan tipe review project."
 
 
-class InsufficientPapersError(MiseliaBaseException):
+class InsufficientPapersError(MiseliaBaseError):
     """Paper yang ditemukan kurang dari MIN_PAPERS_FOR_RUN (5). Blueprint §19.5"""
+
     status_code = 422
     error_code = "insufficient_papers"
     message = "Paper terlalu sedikit untuk menjalankan pipeline."
@@ -115,26 +130,29 @@ class InsufficientPapersError(MiseliaBaseException):
         self.suggestions = suggestions or []
         super().__init__(
             message=f"Hanya ditemukan {paper_count} paper untuk topik ini. "
-                    "Minimal 5 paper dibutuhkan."
+            "Minimal 5 paper dibutuhkan."
         )
 
 
-class AIAllProvidersFailedError(MiseliaBaseException):
+class AIAllProvidersFailedError(MiseliaBaseError):
     """Semua AI provider gagal (GPT-4o + Claude + Gemini). Decision #23"""
+
     status_code = 503
     error_code = "ai_all_providers_failed"
     message = "Pipeline gagal diproses. Coba lagi dalam beberapa menit."
 
 
-class StageRunNotFound(MiseliaBaseException):
+class StageRunNotFoundError(MiseliaBaseError):
     """Stage run tidak ditemukan atau bukan milik user ini."""
+
     status_code = 404
     error_code = "stage_run_not_found"
     message = "Pipeline tidak ditemukan."
 
 
-class ProjectNotFound(MiseliaBaseException):
+class ProjectNotFoundError(MiseliaBaseError):
     """Project tidak ditemukan atau bukan milik user ini."""
+
     status_code = 404
     error_code = "project_not_found"
     message = "Project tidak ditemukan."
@@ -142,22 +160,26 @@ class ProjectNotFound(MiseliaBaseException):
 
 # ── Chat ──────────────────────────────────────────────────────────────────
 
-class ChatSessionLimitReached(MiseliaBaseException):
+
+class ChatSessionLimitReachedError(MiseliaBaseError):
     """User mencapai batas sesi chat bulanan (Free: 3/bulan). Decision #11"""
+
     status_code = 403
     error_code = "chat_session_limit_reached"
     message = "Batas sesi chat bulanan tercapai. Upgrade untuk sesi tidak terbatas."
 
 
-class ChatMessageLimitReached(MiseliaBaseException):
+class ChatMessageLimitReachedError(MiseliaBaseError):
     """User mencapai batas pesan per sesi (Free: 5 pesan). Decision #11"""
+
     status_code = 403
     error_code = "chat_message_limit_reached"
     message = "Batas pesan tercapai. Upgrade untuk chat tidak terbatas."
 
 
-class ChatSessionNotFound(MiseliaBaseException):
+class ChatSessionNotFoundError(MiseliaBaseError):
     """Sesi chat tidak ditemukan atau sudah expired."""
+
     status_code = 404
     error_code = "chat_session_not_found"
     message = "Sesi chat tidak ditemukan."
@@ -165,15 +187,18 @@ class ChatSessionNotFound(MiseliaBaseException):
 
 # ── Library ───────────────────────────────────────────────────────────────
 
-class LibraryPaperNotFound(MiseliaBaseException):
+
+class LibraryPaperNotFoundError(MiseliaBaseError):
     """Paper tidak ditemukan di library user."""
+
     status_code = 404
     error_code = "library_paper_not_found"
     message = "Paper tidak ditemukan di library."
 
 
-class LibraryQuotaExceeded(MiseliaBaseException):
+class LibraryQuotaExceededError(MiseliaBaseError):
     """Library sudah penuh sesuai batas tier. Decision #28"""
+
     status_code = 403
     error_code = "library_quota_exceeded"
     message = "Library sudah penuh. Upgrade untuk menyimpan lebih banyak paper."
@@ -181,15 +206,18 @@ class LibraryQuotaExceeded(MiseliaBaseException):
 
 # ── Import ────────────────────────────────────────────────────────────────
 
-class PreviewExpiredError(MiseliaBaseException):
+
+class PreviewExpiredError(MiseliaBaseError):
     """Import preview sudah kadaluarsa (Redis TTL 10 menit). Decision #28"""
+
     status_code = 410
     error_code = "preview_expired"
     message = "Sesi import kadaluarsa. Upload ulang file untuk melanjutkan."
 
 
-class ImportParseError(MiseliaBaseException):
+class ImportParseError(MiseliaBaseError):
     """File import tidak bisa dibaca / format tidak valid."""
+
     status_code = 422
     error_code = "import_parse_failed"
     message = "File tidak bisa dibaca. Pastikan format file sudah benar."
@@ -197,8 +225,10 @@ class ImportParseError(MiseliaBaseException):
 
 # ── Content Moderation ────────────────────────────────────────────────────
 
-class ContentPolicyViolation(MiseliaBaseException):
+
+class ContentPolicyViolationError(MiseliaBaseError):
     """Konten melanggar kebijakan penggunaan (Decision #29)."""
+
     status_code = 400
     error_code = "content_policy_violation"
     message = "Topik ini tidak bisa diproses. Coba ubah framing pertanyaanmu."
@@ -206,8 +236,10 @@ class ContentPolicyViolation(MiseliaBaseException):
 
 # ── Rate Limit ────────────────────────────────────────────────────────────
 
-class RateLimitExceeded(MiseliaBaseException):
+
+class RateLimitExceededError(MiseliaBaseError):
     """Request terlalu sering dalam waktu singkat."""
+
     status_code = 429
     error_code = "rate_limit_exceeded"
     message = "Terlalu banyak request. Coba lagi setelah beberapa saat."
@@ -215,15 +247,18 @@ class RateLimitExceeded(MiseliaBaseException):
 
 # ── Payment ───────────────────────────────────────────────────────────────
 
-class PaymentNotFound(MiseliaBaseException):
+
+class PaymentNotFoundError(MiseliaBaseError):
     """Transaksi pembayaran tidak ditemukan."""
+
     status_code = 404
     error_code = "payment_not_found"
     message = "Transaksi tidak ditemukan."
 
 
-class WebhookVerificationFailed(MiseliaBaseException):
+class WebhookVerificationFailedError(MiseliaBaseError):
     """Signature Midtrans webhook tidak valid."""
+
     status_code = 400
     error_code = "webhook_verification_failed"
     message = "Webhook tidak valid."

@@ -96,8 +96,6 @@ async def health_check_db() -> JSONResponse:
                 "db": "disconnected",
                 "latency_ms": latency_ms,
                 # Tidak expose detail error ke client di production
-                "detail": str(exc)
-                if settings.is_development
-                else "DB connection failed",
+                "detail": str(exc) if settings.is_development else "DB connection failed",
             },
         )

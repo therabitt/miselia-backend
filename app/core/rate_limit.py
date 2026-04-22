@@ -22,17 +22,19 @@ from app.core.exceptions import RateLimitExceeded
 
 # ── Rate limit rules (requests per hour) ─────────────────────────────────
 
+
 @dataclass(frozen=True)
 class RateLimitRule:
     key_prefix: str
     max_requests: int
     window_seconds: int = 3600  # 1 jam default
 
+
 RATE_LIMITS = {
-    "guest_find_papers":  RateLimitRule("rl:guest:fp",     max_requests=10),
-    "auth_find_papers":   RateLimitRule("rl:auth:fp",      max_requests=60),
-    "pipeline_submit":    RateLimitRule("rl:pipeline",     max_requests=20),
-    "chat_messages":      RateLimitRule("rl:chat",         max_requests=100),
+    "guest_find_papers": RateLimitRule("rl:guest:fp", max_requests=10),
+    "auth_find_papers": RateLimitRule("rl:auth:fp", max_requests=60),
+    "pipeline_submit": RateLimitRule("rl:pipeline", max_requests=20),
+    "chat_messages": RateLimitRule("rl:chat", max_requests=100),
 }
 
 # ── Redis client (lazy init) ─────────────────────────────────────────────
@@ -53,6 +55,7 @@ def get_redis() -> aioredis.Redis:
 
 
 # ── Core check function ───────────────────────────────────────────────────
+
 
 async def check_rate_limit(
     limit_name: str,
@@ -80,8 +83,7 @@ async def check_rate_limit(
 
         if count > rule.max_requests:
             raise RateLimitExceeded(
-                message=f"Terlalu banyak request. "
-                        f"Batas {rule.max_requests} per jam tercapai."
+                message=f"Terlalu banyak request. " f"Batas {rule.max_requests} per jam tercapai."
             )
     except RateLimitExceeded:
         raise

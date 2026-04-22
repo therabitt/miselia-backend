@@ -13,13 +13,12 @@
 import asyncio
 import logging
 from logging.config import fileConfig
-from typing import Any
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from alembic import context
 from app.config import settings
 from app.models.database import Base
 
@@ -37,6 +36,7 @@ target_metadata = Base.metadata
 
 
 # ── URL helpers ───────────────────────────────────────────────────────────
+
 
 def _get_sync_url() -> str:
     """
@@ -58,6 +58,7 @@ def _get_async_url() -> str:
 
 # ── Offline mode ──────────────────────────────────────────────────────────
 
+
 def run_migrations_offline() -> None:
     """
     Generate SQL migration script tanpa koneksi DB.
@@ -78,6 +79,7 @@ def run_migrations_offline() -> None:
 
 
 # ── Online mode ───────────────────────────────────────────────────────────
+
 
 def do_run_migrations(connection: Connection) -> None:
     """

@@ -16,13 +16,12 @@ on:
   push:
     branches: [main, staging]
     paths:
-      # Hanya trigger jika ada perubahan di backend
-      - "miselia-backend/**"
+      - "**"
       - ".github/workflows/ci.yml"
   pull_request:
     branches: [main, staging]
     paths:
-      - "miselia-backend/**"
+      - "**"
       - ".github/workflows/ci.yml"
 
 jobs:
@@ -41,7 +40,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: miselia-backend/requirements*.txt
+          cache-dependency-path: "requirements*.txt"
 
       - name: Install dev dependencies
         run: pip install -r requirements-dev.txt
@@ -102,7 +101,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: miselia-backend/requirements*.txt
+          cache-dependency-path: "requirements*.txt"
 
       - name: Install dependencies
         run: |
@@ -140,5 +139,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: miselia-backend/htmlcov/
+          path: htmlcov/
           if-no-files-found: ignore

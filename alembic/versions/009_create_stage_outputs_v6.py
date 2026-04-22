@@ -17,11 +17,12 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "009"
-down_revision: str | None = "006"   # [GAP F1-1] Chain fix: 007 & 008 dibuat Fase 1
+down_revision: str | None = "006"  # [GAP F1-1] Chain fix: 007 & 008 dibuat Fase 1
 branch_labels: str | None = None
 depends_on: str | None = None
 
@@ -49,8 +50,8 @@ def upgrade() -> None:
         # File paths di Cloudflare R2
         # Format: outputs/{user_id}/{project_id}/{stage_run_id}/{stage_type}_{YYYY-MM-DD}.{ext}
         # Ref: Blueprint Appendix A R2 naming convention
-        sa.Column("docx_path", sa.Text(), nullable=True),      # NULL untuk P8
-        sa.Column("pdf_path", sa.Text(), nullable=True),        # Untuk P8
+        sa.Column("docx_path", sa.Text(), nullable=True),  # NULL untuk P8
+        sa.Column("pdf_path", sa.Text(), nullable=True),  # Untuk P8
         # diagram_path: PNG statis P4 (export user) — BERBEDA dari diagram_data
         # [M1 FIX] diagram_data (JSONB live React Flow nodes/edges) ditambahkan Migration 027 (Fase 6B)
         sa.Column("diagram_path", sa.Text(), nullable=True),

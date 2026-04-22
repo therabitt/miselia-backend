@@ -40,7 +40,6 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncSession,
@@ -55,6 +54,7 @@ from app.models.database import Base
 # ═══════════════════════════════════════════════════════════════════════════
 # Test database URL
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _get_test_database_url() -> str:
     """
@@ -91,6 +91,7 @@ TEST_DATABASE_URL = _get_test_database_url()
 # Dijalankan SEKALI per pytest session — membuat semua tabel
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(scope="session")
 def anyio_backend() -> str:
     """Gunakan asyncio sebagai backend untuk anyio (dipakai pytest-asyncio)."""
@@ -105,7 +106,7 @@ async def test_engine() -> AsyncGenerator[Any, None]:
     """
     engine = create_async_engine(
         TEST_DATABASE_URL,
-        echo=False,          # Matikan SQL logging di test
+        echo=False,  # Matikan SQL logging di test
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=10,
@@ -131,6 +132,7 @@ async def test_engine() -> AsyncGenerator[Any, None]:
 # Function-scoped: Transaction rollback per test
 # Setiap test berjalan dalam nested transaction yang di-rollback setelah selesai
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 @pytest_asyncio.fixture
 async def db_connection(test_engine: Any) -> AsyncGenerator[AsyncConnection, None]:
@@ -174,6 +176,7 @@ async def db_session(db_connection: AsyncConnection) -> AsyncGenerator[AsyncSess
 # HTTP test client
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest_asyncio.fixture
 async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
@@ -207,6 +210,7 @@ async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
 # Test data fixtures
 # Blueprint §6.1 — User
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 @pytest_asyncio.fixture
 async def test_user(db_session: AsyncSession) -> Any:
@@ -262,6 +266,7 @@ async def test_admin_user(db_session: AsyncSession) -> Any:
 # Blueprint §6.9 — InstitutionalAccount
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest_asyncio.fixture
 async def test_institutional_account(db_session: AsyncSession) -> Any:
     """
@@ -290,6 +295,7 @@ async def test_institutional_account(db_session: AsyncSession) -> Any:
 # Subscription fixtures — satu per tier
 # Blueprint §6.2, §7.1
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 @pytest_asyncio.fixture
 async def subscription_free(db_session: AsyncSession, test_user: Any) -> Any:
@@ -398,6 +404,7 @@ async def subscription_institutional(
 # Convenience fixture — semua tier sekaligus
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest_asyncio.fixture
 async def all_subscriptions(
     subscription_free: Any,
@@ -425,7 +432,10 @@ async def all_subscriptions(
 # Helper: JWT token mock untuk test endpoint yang butuh auth
 # ═══════════════════════════════════════════════════════════════════════════
 
-def make_test_auth_header(supabase_id: str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") -> dict[str, str]:
+
+def make_test_auth_header(
+    supabase_id: str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+) -> dict[str, str]:
     """
     Buat Authorization header untuk test.
     Digunakan untuk override verify_jwt() di endpoint test.

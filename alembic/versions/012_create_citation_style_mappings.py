@@ -15,11 +15,12 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "012"
-down_revision: str | None = "010"   # Gap: 011 dibuat Fase 2
+down_revision: str | None = "010"  # Gap: 011 dibuat Fase 2
 branch_labels: str | None = None
 depends_on: str | None = None
 

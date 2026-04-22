@@ -11,7 +11,7 @@
 from fastapi import Request
 
 from app.config import settings
-from app.core.exceptions import AdminRequiredError, ForbiddenError
+from app.core.exceptions import ForbiddenError
 
 
 def get_client_ip(request: Request) -> str:
@@ -34,9 +34,7 @@ def require_admin_ip(request: Request) -> None:
     """
     client_ip = get_client_ip(request)
     if client_ip not in settings.admin_ip_list:
-        raise ForbiddenError(
-            message=f"Akses dari IP {client_ip} tidak diizinkan."
-        )
+        raise ForbiddenError(message=f"Akses dari IP {client_ip} tidak diizinkan.")
 
 
 def is_admin_ip(request: Request) -> bool:

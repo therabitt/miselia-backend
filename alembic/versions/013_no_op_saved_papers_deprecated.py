@@ -16,7 +16,7 @@
 #
 #           RESOLUSI: No-op ini dibuat untuk menjaga nomor urut migration
 #           tetap konsisten. Tidak ada DDL yang dijalankan.
-#           Ref: Konflik teridentifikasi dan dikonfirmasi developer — 
+#           Ref: Konflik teridentifikasi dan dikonfirmasi developer —
 #           "saved_papers digantikan library_papers (migration 019)."
 #
 # Revision: 013

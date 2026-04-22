@@ -23,11 +23,12 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "015"
-down_revision: str | None = "013"   # Gap: 014 dibuat Fase 6A
+down_revision: str | None = "013"  # Gap: 014 dibuat Fase 6A
 branch_labels: str | None = None
 depends_on: str | None = None
 
@@ -79,7 +80,7 @@ def upgrade() -> None:
         referent_table="prompt_versions",
         local_cols=["prompt_version_id"],
         remote_cols=["id"],
-        ondelete="SET NULL",    # Jika prompt version dihapus, set ke NULL (jangan cascade)
+        ondelete="SET NULL",  # Jika prompt version dihapus, set ke NULL (jangan cascade)
     )
 
 

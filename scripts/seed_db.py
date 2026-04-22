@@ -22,10 +22,10 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 # Allow standalone execution
@@ -41,9 +41,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ═════════════════════════════════════════════════════════════════════════════
 
 PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
-
     # ── P1: Literature Review ─────────────────────────────────────────────
-
     {
         "stage_type": "literature_review",
         "prompt_name": "query_optimization",
@@ -63,7 +61,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             'Format output:\n["query 1", "query 2", "query 3", "query 4", "query 5"]'
         ),
     },
-
     {
         "stage_type": "literature_review",
         "prompt_name": "paper_relevance",
@@ -85,7 +82,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '  "key_findings": ["..."], "should_include": true}]'
         ),
     },
-
     {
         "stage_type": "literature_review",
         "prompt_name": "landscape_overview",
@@ -106,7 +102,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "perkembangan_historis": "...", "konsensus_penelitian": "...", "kontroversi_aktif": "..."}'
         ),
     },
-
     {
         "stage_type": "literature_review",
         "prompt_name": "lit_review_draft",
@@ -128,9 +123,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '{"lit_review_draft": "...", "research_gaps_basic": [{"gap": "...", "evidence": "..."}]}'
         ),
     },
-
     # ── P2: Research Gap & Novelty ────────────────────────────────────────
-
     {
         "stage_type": "research_gap",
         "prompt_name": "gap_identification",
@@ -153,7 +146,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '  "evidence": ["paper_id_1"], "confidence": 0.78}]'
         ),
     },
-
     {
         "stage_type": "research_gap",
         "prompt_name": "novelty_synthesis",
@@ -175,9 +167,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '   "type": "deskriptif|komparatif|asosiatif|eksplanatif"}]}'
         ),
     },
-
     # ── P3: Methodology Advisor ───────────────────────────────────────────
-
     {
         "stage_type": "methodology_advisor",
         "prompt_name": "methodology_recommendation",
@@ -201,7 +191,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '                 "alasan": "...", "catatan": "..."}]}'
         ),
     },
-
     {
         "stage_type": "methodology_advisor",
         "prompt_name": "instrument_analysis",
@@ -223,9 +212,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '                                "reason": "..."}]}'
         ),
     },
-
     # ── P4: Hypothesis & Variable (Kuantitatif) ───────────────────────────
-
     {
         "stage_type": "hypothesis_variable",
         "prompt_name": "variable_identification",
@@ -245,7 +232,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '                "indicators": ["indikator 1", "indikator 2", "indikator 3"]}]}'
         ),
     },
-
     {
         "stage_type": "hypothesis_variable",
         "prompt_name": "hypothesis_generation",
@@ -264,9 +250,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '                {"id": "H0_1", "statement": "...", "type": "null"}]}'
         ),
     },
-
     # ── P4: Proposisi & Tema (Kualitatif) ─────────────────────────────────
-
     {
         "stage_type": "proposisi_tema",
         "prompt_name": "theme_mapping",
@@ -283,7 +267,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '             "sub_themes": ["sub-tema 1", "sub-tema 2"]}]}'
         ),
     },
-
     {
         "stage_type": "proposisi_tema",
         "prompt_name": "proposition_generation",
@@ -299,9 +282,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "guiding_questions": [{"theme": "...", "questions": ["pertanyaan 1", "pertanyaan 2"]}]}'
         ),
     },
-
     # ── P5: Chapter Outline ───────────────────────────────────────────────
-
     {
         "stage_type": "chapter_outline",
         "prompt_name": "chapter_outline",
@@ -322,9 +303,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "total_estimated_pages": {"min": 70, "max": 100}}'
         ),
     },
-
     # ── P6: Bab 1 Writer ──────────────────────────────────────────────────
-
     {
         "stage_type": "bab1_writer",
         "prompt_name": "latar_belakang",
@@ -341,7 +320,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '{"latar_belakang": "..."}'
         ),
     },
-
     {
         "stage_type": "bab1_writer",
         "prompt_name": "identifikasi_rumusan_masalah",
@@ -357,7 +335,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "rumusan_masalah": ["Bagaimana...", "Apakah..."]}'
         ),
     },
-
     {
         "stage_type": "bab1_writer",
         "prompt_name": "tujuan_manfaat",
@@ -370,9 +347,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "manfaat_penelitian": {"teoritis": ["..."], "praktis": ["..."]}}'
         ),
     },
-
     # ── P7: Systematic Literature Review (Magister only) ─────────────────
-
     {
         "stage_type": "systematic_review",
         "prompt_name": "pico_criteria",
@@ -390,7 +365,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "exclusion_criteria": ["Studi yang tidak...", "Paper yang..."]}'
         ),
     },
-
     {
         "stage_type": "systematic_review",
         "prompt_name": "prisma_screening",
@@ -404,7 +378,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '  "screening_reason": "..."}]'
         ),
     },
-
     {
         "stage_type": "systematic_review",
         "prompt_name": "quality_assessment",
@@ -418,7 +391,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '  "quality_justification": "...", "risk_of_bias": "low|medium|high"}]'
         ),
     },
-
     {
         "stage_type": "systematic_review",
         "prompt_name": "evidence_synthesis",
@@ -433,9 +405,7 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             ' "evidence_table": [{"paper_id": "...", "key_findings": ["..."], "quality_score": 0.82}]}'
         ),
     },
-
     # ── P8: Sidang Preparation ────────────────────────────────────────────
-
     {
         "stage_type": "sidang_preparation",
         "prompt_name": "weakness_identification",
@@ -450,7 +420,6 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
             '                 "description": "...", "severity": "tinggi|sedang|rendah"}]}'
         ),
     },
-
     {
         "stage_type": "sidang_preparation",
         "prompt_name": "question_answer_generation",
@@ -478,31 +447,83 @@ PROMPT_VERSIONS_SEED: list[dict[str, Any]] = [
 
 FEATURE_FLAGS_SEED: list[dict[str, Any]] = [
     # Pipeline availability — MVP (aktif di launch)
-    {"name": "pipeline_1_enabled",          "is_enabled": True,  "description": "P1: Literature Review"},
-    {"name": "pipeline_2_enabled",          "is_enabled": True,  "description": "P2: Research Gap"},
+    {"name": "pipeline_1_enabled", "is_enabled": True, "description": "P1: Literature Review"},
+    {"name": "pipeline_2_enabled", "is_enabled": True, "description": "P2: Research Gap"},
     # Pipeline availability — Tier A (aktif Bulan 2)
-    {"name": "pipeline_3_enabled",          "is_enabled": False, "description": "P3: Methodology Advisor (Tier A)"},
-    {"name": "pipeline_4_enabled",          "is_enabled": False, "description": "P4: Hypothesis/Proposisi (Tier A)"},
-    {"name": "pipeline_5_enabled",          "is_enabled": False, "description": "P5: Chapter Outline (Tier A)"},
+    {
+        "name": "pipeline_3_enabled",
+        "is_enabled": False,
+        "description": "P3: Methodology Advisor (Tier A)",
+    },
+    {
+        "name": "pipeline_4_enabled",
+        "is_enabled": False,
+        "description": "P4: Hypothesis/Proposisi (Tier A)",
+    },
+    {
+        "name": "pipeline_5_enabled",
+        "is_enabled": False,
+        "description": "P5: Chapter Outline (Tier A)",
+    },
     # Pipeline availability — Tier B (aktif Bulan 4+)
-    {"name": "pipeline_6_enabled",          "is_enabled": False, "description": "P6: Bab 1 Writer (Tier B)"},
-    {"name": "pipeline_7_enabled",          "is_enabled": False, "description": "P7: SLR Magister only (Tier B)"},
-    {"name": "pipeline_8_enabled",          "is_enabled": False, "description": "P8: Sidang Preparation (Tier B)"},
+    {"name": "pipeline_6_enabled", "is_enabled": False, "description": "P6: Bab 1 Writer (Tier B)"},
+    {
+        "name": "pipeline_7_enabled",
+        "is_enabled": False,
+        "description": "P7: SLR Magister only (Tier B)",
+    },
+    {
+        "name": "pipeline_8_enabled",
+        "is_enabled": False,
+        "description": "P8: Sidang Preparation (Tier B)",
+    },
     # Core features (aktif di launch)
-    {"name": "find_papers_enabled",         "is_enabled": True,  "description": "Find Papers workflow"},
-    {"name": "library_enabled",             "is_enabled": True,  "description": "Library feature"},
-    {"name": "chat_with_papers_enabled",    "is_enabled": True,  "description": "Chat with Papers"},
+    {"name": "find_papers_enabled", "is_enabled": True, "description": "Find Papers workflow"},
+    {"name": "library_enabled", "is_enabled": True, "description": "Library feature"},
+    {"name": "chat_with_papers_enabled", "is_enabled": True, "description": "Chat with Papers"},
     # Tier A features
-    {"name": "csv_import_enabled",          "is_enabled": False, "description": "CSV import ke Library — aktif akhir Fase 5 (Decision #28)"},
-    {"name": "bib_ris_import_enabled",      "is_enabled": False, "description": "BibTeX & RIS import ke Library — aktif Tier A (Decision #28)"},
-    {"name": "referral_system_enabled",     "is_enabled": False, "description": "Referral system (Tier A)"},
-    {"name": "institutional_plan_enabled",  "is_enabled": False, "description": "Institutional plan (Tier A)"},
+    {
+        "name": "csv_import_enabled",
+        "is_enabled": False,
+        "description": "CSV import ke Library — aktif akhir Fase 5 (Decision #28)",
+    },
+    {
+        "name": "bib_ris_import_enabled",
+        "is_enabled": False,
+        "description": "BibTeX & RIS import ke Library — aktif Tier A (Decision #28)",
+    },
+    {
+        "name": "referral_system_enabled",
+        "is_enabled": False,
+        "description": "Referral system (Tier A)",
+    },
+    {
+        "name": "institutional_plan_enabled",
+        "is_enabled": False,
+        "description": "Institutional plan (Tier A)",
+    },
     # Tier B features
-    {"name": "auto_debit_enabled",          "is_enabled": False, "description": "Auto-debit renewal (Tier B)"},
-    {"name": "websocket_progress_enabled",  "is_enabled": False, "description": "WebSocket progress (Tier B)"},
-    {"name": "collaboration_enabled",       "is_enabled": False, "description": "Project sharing (Tier B)"},
+    {
+        "name": "auto_debit_enabled",
+        "is_enabled": False,
+        "description": "Auto-debit renewal (Tier B)",
+    },
+    {
+        "name": "websocket_progress_enabled",
+        "is_enabled": False,
+        "description": "WebSocket progress (Tier B)",
+    },
+    {
+        "name": "collaboration_enabled",
+        "is_enabled": False,
+        "description": "Project sharing (Tier B)",
+    },
     # AI Infrastructure
-    {"name": "ai_fallback_enabled",         "is_enabled": True,  "description": "AI fallback ke Claude/Gemini jika GPT-4o down (Decision #23)"},
+    {
+        "name": "ai_fallback_enabled",
+        "is_enabled": True,
+        "description": "AI fallback ke Claude/Gemini jika GPT-4o down (Decision #23)",
+    },
 ]
 
 
@@ -514,39 +535,194 @@ FEATURE_FLAGS_SEED: list[dict[str, Any]] = [
 
 CITATION_STYLE_MAPPINGS_SEED: list[dict[str, Any]] = [
     # ── HIGH confidence (18) ──────────────────────────────────────────────
-    {"field_of_study": "Psikologi",               "recommended_style": "apa7",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Ilmu Pendidikan",          "recommended_style": "apa7",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Bimbingan dan Konseling",  "recommended_style": "apa7",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Sosiologi",                "recommended_style": "apa7",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Ilmu Komunikasi",          "recommended_style": "apa7",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Kesehatan Masyarakat",     "recommended_style": "vancouver", "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Kedokteran",               "recommended_style": "vancouver", "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Keperawatan",              "recommended_style": "vancouver", "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Farmasi",                  "recommended_style": "vancouver", "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Teknik Elektro",           "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Teknik Informatika",       "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Ilmu Komputer",            "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Teknik Sipil",             "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Teknik Mesin",             "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Matematika",               "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Fisika",                   "recommended_style": "ieee",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Sastra Indonesia",         "recommended_style": "mla9",      "confidence_level": "high",   "notes": None},
-    {"field_of_study": "Sastra Inggris",           "recommended_style": "mla9",      "confidence_level": "high",   "notes": None},
+    {
+        "field_of_study": "Psikologi",
+        "recommended_style": "apa7",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Ilmu Pendidikan",
+        "recommended_style": "apa7",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Bimbingan dan Konseling",
+        "recommended_style": "apa7",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Sosiologi",
+        "recommended_style": "apa7",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Ilmu Komunikasi",
+        "recommended_style": "apa7",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Kesehatan Masyarakat",
+        "recommended_style": "vancouver",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Kedokteran",
+        "recommended_style": "vancouver",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Keperawatan",
+        "recommended_style": "vancouver",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Farmasi",
+        "recommended_style": "vancouver",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Teknik Elektro",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Teknik Informatika",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Ilmu Komputer",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Teknik Sipil",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Teknik Mesin",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Matematika",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Fisika",
+        "recommended_style": "ieee",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Sastra Indonesia",
+        "recommended_style": "mla9",
+        "confidence_level": "high",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Sastra Inggris",
+        "recommended_style": "mla9",
+        "confidence_level": "high",
+        "notes": None,
+    },
     # ── MEDIUM confidence (12) ────────────────────────────────────────────
-    {"field_of_study": "Manajemen",                "recommended_style": "apa7",      "confidence_level": "medium", "notes": "Beberapa institusi menggunakan Chicago"},
-    {"field_of_study": "Akuntansi",                "recommended_style": "apa7",      "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Ekonomi",                  "recommended_style": "apa7",      "confidence_level": "medium", "notes": "Economics journals sering IEEE atau Chicago"},
-    {"field_of_study": "Hukum",                    "recommended_style": "chicago",   "confidence_level": "medium", "notes": "Bervariasi antar fakultas hukum"},
-    {"field_of_study": "Sejarah",                  "recommended_style": "chicago",   "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Ilmu Politik",             "recommended_style": "apa7",      "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Hubungan Internasional",   "recommended_style": "apa7",      "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Administrasi Publik",      "recommended_style": "apa7",      "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Antropologi",              "recommended_style": "apa7",      "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Biologi",                  "recommended_style": "vancouver", "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Kimia",                    "recommended_style": "vancouver", "confidence_level": "medium", "notes": None},
-    {"field_of_study": "Gizi dan Dietetika",       "recommended_style": "vancouver", "confidence_level": "medium", "notes": None},
+    {
+        "field_of_study": "Manajemen",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": "Beberapa institusi menggunakan Chicago",
+    },
+    {
+        "field_of_study": "Akuntansi",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Ekonomi",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": "Economics journals sering IEEE atau Chicago",
+    },
+    {
+        "field_of_study": "Hukum",
+        "recommended_style": "chicago",
+        "confidence_level": "medium",
+        "notes": "Bervariasi antar fakultas hukum",
+    },
+    {
+        "field_of_study": "Sejarah",
+        "recommended_style": "chicago",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Ilmu Politik",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Hubungan Internasional",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Administrasi Publik",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Antropologi",
+        "recommended_style": "apa7",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Biologi",
+        "recommended_style": "vancouver",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Kimia",
+        "recommended_style": "vancouver",
+        "confidence_level": "medium",
+        "notes": None,
+    },
+    {
+        "field_of_study": "Gizi dan Dietetika",
+        "recommended_style": "vancouver",
+        "confidence_level": "medium",
+        "notes": None,
+    },
     # ── LOW confidence (1) ────────────────────────────────────────────────
-    {"field_of_study": "Arsitektur",               "recommended_style": "apa7",      "confidence_level": "low",    "notes": "Sangat bervariasi per institusi"},
+    {
+        "field_of_study": "Arsitektur",
+        "recommended_style": "apa7",
+        "confidence_level": "low",
+        "notes": "Sangat bervariasi per institusi",
+    },
 ]
 
 
@@ -554,13 +730,14 @@ CITATION_STYLE_MAPPINGS_SEED: list[dict[str, Any]] = [
 # Seed functions — dipanggil dari migration 024 atau standalone
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 def seed_prompt_versions(bind: Any) -> None:
     """
     Seed 22 prompt entries ke tabel prompt_versions.
     Idempotent: skip jika (stage_type, prompt_name, version) sudah ada.
     Ref: Blueprint §9.9, Appendix D migration 024
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     inserted = 0
     skipped = 0
 
@@ -603,9 +780,7 @@ def seed_prompt_versions(bind: Any) -> None:
         inserted += 1
 
     print(f"  seed_prompt_versions: {inserted} inserted, {skipped} skipped")
-    assert (inserted + skipped) == 22, (
-        f"Expected 22 prompt entries total, got {inserted + skipped}"
-    )
+    assert (inserted + skipped) == 22, f"Expected 22 prompt entries total, got {inserted + skipped}"
 
 
 def seed_feature_flags(bind: Any) -> None:
@@ -614,15 +789,13 @@ def seed_feature_flags(bind: Any) -> None:
     Idempotent: skip jika name sudah ada.
     Ref: Blueprint Appendix C (source of truth — bukan 20/21 dari PMD/Appendix D)
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     inserted = 0
     skipped = 0
 
     for flag in FEATURE_FLAGS_SEED:
         result = bind.execute(
-            __import__("sqlalchemy").text(
-                "SELECT id FROM feature_flags WHERE name = :name"
-            ),
+            __import__("sqlalchemy").text("SELECT id FROM feature_flags WHERE name = :name"),
             {"name": flag["name"]},
         ).fetchone()
 
@@ -648,9 +821,7 @@ def seed_feature_flags(bind: Any) -> None:
         inserted += 1
 
     print(f"  seed_feature_flags: {inserted} inserted, {skipped} skipped")
-    assert (inserted + skipped) == 19, (
-        f"Expected 19 feature flags total, got {inserted + skipped}"
-    )
+    assert (inserted + skipped) == 19, f"Expected 19 feature flags total, got {inserted + skipped}"
 
 
 def seed_citation_style_mappings(bind: Any) -> None:
@@ -660,7 +831,7 @@ def seed_citation_style_mappings(bind: Any) -> None:
     Ref: Blueprint Appendix F
     Distribution: HIGH=18, MEDIUM=12, LOW=1
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     inserted = 0
     skipped = 0
 
@@ -694,14 +865,15 @@ def seed_citation_style_mappings(bind: Any) -> None:
         inserted += 1
 
     print(f"  seed_citation_style_mappings: {inserted} inserted, {skipped} skipped")
-    assert (inserted + skipped) == 31, (
-        f"Expected 31 citation mappings total, got {inserted + skipped}"
-    )
+    assert (
+        inserted + skipped
+    ) == 31, f"Expected 31 citation mappings total, got {inserted + skipped}"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Standalone execution — untuk re-seed manual tanpa alembic
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 def _run_standalone() -> None:
     """
@@ -709,7 +881,8 @@ def _run_standalone() -> None:
       python scripts/seed_db.py
     Membutuhkan DATABASE_URL di .env atau environment.
     """
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import create_engine
+
     from app.config import settings
 
     print("Running seed_db.py standalone...")
