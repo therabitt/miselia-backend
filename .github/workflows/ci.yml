@@ -25,10 +25,6 @@ on:
       - "miselia-backend/**"
       - ".github/workflows/ci.yml"
 
-defaults:
-  run:
-    working-directory: miselia-backend
-
 jobs:
   # ── Job 1: Lint & Type Check ─────────────────────────────────────────────
   lint:

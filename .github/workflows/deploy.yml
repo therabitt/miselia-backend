@@ -43,10 +43,6 @@ concurrency:
   group: deploy-backend-${{ github.ref }}
   cancel-in-progress: false  # Jangan cancel deploy yang sedang berjalan
 
-defaults:
-  run:
-    working-directory: miselia-backend
-
 jobs:
   # ── Gate: CI harus lulus dulu ─────────────────────────────────────────────
   check-ci:
