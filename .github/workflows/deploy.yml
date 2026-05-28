@@ -76,6 +76,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
+            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --service ${{ secrets.RAILWAY_SERVICE_API }} \
             --detach \
             --no-gitignore
@@ -86,6 +87,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
+            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --service ${{ secrets.RAILWAY_SERVICE_WORKER }} \
             --detach \
             --no-gitignore
@@ -96,6 +98,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
+            --project ${{ secrets.RAILWAY_PROJECT_ID }} \
             --service ${{ secrets.RAILWAY_SERVICE_BEAT }} \
             --detach \
             --no-gitignore

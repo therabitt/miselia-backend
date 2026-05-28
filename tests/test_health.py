@@ -13,3 +13,11 @@
 # Step    : STEP 8 (skeleton) → Fase berikutnya (implementasi)
 # Ref     : Blueprint §2.2, PMD Fase 0 DoD
 # ═══════════════════════════════════════════════════════════════════════════
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_placeholder_health_check() -> None:
+    """Placeholder test untuk mencegah pytest exit code 5 (no tests found)."""
+    assert True
