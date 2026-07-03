@@ -737,11 +737,8 @@ class Paper(Base):
     library_papers = relationship("LibraryPaper", back_populates="paper")
 
     def __repr__(self) -> str:
-        title_preview = (
-            (self.title[:40] + "...")
-            if self.title and len(self.title) > 40
-            else (self.title or "N/A")
-        )
+        title_str = str(self.title) if self.title is not None else ""
+        title_preview = (title_str[:40] + "...") if len(title_str) > 40 else (title_str or "N/A")
         return f"<Paper title={title_preview!r}>"
 
 
@@ -934,7 +931,7 @@ class LibraryPaper(Base):
     import_batch_id = Column(UUID(as_uuid=True), ForeignKey("import_batches.id"), nullable=True)
     notes = Column(Text, nullable=True)  # max 2000 char — enforced di service
     # tags: TEXT[] — GIN index via migration raw SQL. Ref: Blueprint §6.12 [FIX]
-    tags = Column(ARRAY(Text), nullable=True)
+    tags: Mapped[list[str] | None] = Column(ARRAY(Text), nullable=True)  # type: ignore[assignment]
     is_incomplete = Column(Boolean, default=False, server_default="false", nullable=False)
     # Soft delete fields — Decision #2, Decision #7
     is_visible = Column(Boolean, default=True, server_default="true", nullable=False)
@@ -1029,7 +1026,8 @@ class ChatMessage(Base):
     session = relationship("ChatSession", back_populates="messages")
 
     def __repr__(self) -> str:
-        return f"<ChatMessage role={self.role!r} len={len(self.content)}>"
+        content_str = str(self.content) if self.content is not None else ""
+        return f"<ChatMessage role={self.role!r} len={len(content_str)}>"
 
 
 # ── UserPreferences (Migration 011) ──────────────────────────────────────

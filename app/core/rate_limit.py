@@ -18,7 +18,7 @@ from typing import Optional
 import redis.asyncio as aioredis
 
 from app.config import settings
-from app.core.exceptions import RateLimitExceeded
+from app.core.exceptions import RateLimitExceededError
 
 # ── Rate limit rules (requests per hour) ─────────────────────────────────
 
@@ -63,7 +63,7 @@ async def check_rate_limit(
 ) -> None:
     """
     Cek dan increment counter rate limit.
-    Raise RateLimitExceeded jika melampaui batas.
+    Raise RateLimitExceededError jika melampaui batas.
 
     Pattern: Redis INCR key → set EXPIRE jika baru → cek vs max_requests.
     Atomic per-key (single INCR tidak perlu transaction).
@@ -82,10 +82,10 @@ async def check_rate_limit(
             await redis.expire(key, rule.window_seconds)
 
         if count > rule.max_requests:
-            raise RateLimitExceeded(
+            raise RateLimitExceededError(
                 message=f"Terlalu banyak request. " f"Batas {rule.max_requests} per jam tercapai."
             )
-    except RateLimitExceeded:
+    except RateLimitExceededError:
         raise
     except Exception:
         # Redis down → fail open (jangan block request karena infra issue)

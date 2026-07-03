@@ -196,7 +196,7 @@ async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
     app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
-        transport=ASGITransport(app=app),
+        transport=ASGITransport(app=app),  # type: ignore[arg-type]
         base_url="http://testserver",
         headers={"Content-Type": "application/json"},
     ) as client:

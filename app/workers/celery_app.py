@@ -127,13 +127,13 @@ celery_app.conf.beat_schedule = {
     # Daily 08:00 WIB (01:00 UTC) — kirim email H-7, H-3, H-0, H+1, H+3
     "send-renewal-notifications": {
         "task": "app.workers.scheduled.subscriptions.send_renewal_notifications",
-        "schedule": crontab(hour=1, minute=0),
+        "schedule": crontab(hour="1", minute="0"),
         "options": {"queue": "maintenance"},
     },
     # Daily 09:00 WIB (02:00 UTC) — kirim email H-7 sebelum library paper Free expired
     "notify-library-expiry": {
         "task": "app.workers.scheduled.subscriptions.notify_library_expiry",
-        "schedule": crontab(hour=2, minute=0),
+        "schedule": crontab(hour="2", minute="0"),
         "options": {"queue": "maintenance"},
     },
     # ── Reconciliation & Cleanup ──────────────────────────────────────────
@@ -146,7 +146,7 @@ celery_app.conf.beat_schedule = {
     # Setiap 2 jam — verifikasi ulang payment pending > 1 jam
     "check-pending-payments": {
         "task": "app.workers.scheduled.reconciliation.check_pending_payments",
-        "schedule": crontab(minute=0, hour="*/2"),
+        "schedule": crontab(minute="0", hour="*/2"),
         "options": {"queue": "maintenance"},
     },
     # ── Library Maintenance ───────────────────────────────────────────────
@@ -154,7 +154,7 @@ celery_app.conf.beat_schedule = {
     # Ref: Blueprint §2.2 maintenance.py (cleanup_expired_library_papers)
     "hard-delete-expired-papers": {
         "task": "app.workers.scheduled.maintenance.cleanup_expired_library_papers",
-        "schedule": crontab(hour=19, minute=0),
+        "schedule": crontab(hour="19", minute="0"),
         "options": {"queue": "maintenance"},
     },
     # ── Analytics & Partitions ────────────────────────────────────────────
@@ -162,20 +162,20 @@ celery_app.conf.beat_schedule = {
     # KRITIS: analytics_events query FAIL jika tidak ada partisi matching (Blueprint §6.15)
     "create-monthly-partition": {
         "task": "app.workers.scheduled.maintenance.create_monthly_partition",
-        "schedule": crontab(hour=17, minute=5, day_of_month=1),
+        "schedule": crontab(hour="17", minute="5", day_of_month="1"),
         "options": {"queue": "maintenance"},
     },
     # ── Intelligence & Reporting ──────────────────────────────────────────
     # Daily 01:30 WIB (18:30 UTC hari sebelumnya) — agregasi metrics harian
     "daily-intelligence-aggregation": {
         "task": "app.workers.scheduled.intelligence.daily_intelligence_aggregation",
-        "schedule": crontab(hour=18, minute=30),
+        "schedule": crontab(hour="18", minute="30"),
         "options": {"queue": "maintenance"},
     },
     # Setiap Minggu 02:00 WIB (Minggu, 19:00 UTC Sabtu) — laporan performa prompt
     "weekly-prompt-report": {
         "task": "app.workers.scheduled.prompt_report.weekly_prompt_performance_report",
-        "schedule": crontab(hour=19, minute=0, day_of_week=6),  # 6 = Sabtu UTC = Minggu WIB
+        "schedule": crontab(hour="19", minute="0", day_of_week="6"),  # 6 = Sabtu UTC = Minggu WIB
         "options": {"queue": "maintenance"},
     },
 }

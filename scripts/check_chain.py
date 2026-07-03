@@ -1,3 +1,14 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# File    : scripts/check_chain.py
+# Desc    : Verifikasi chain migration Fase 0 + Fase 1
+#           Mengecek file migration di alembic/versions dan
+#           mencocokkan attribute down_revision dengan yang diharapkan.
+# Layer   : Scripts
+# Deps    : importlib.util, os
+# Step    : Dev validation
+# Ref     : Blueprint
+# ═════════════════════════════════════════════════════════════════════════════
+
 import importlib.util
 import os
 
@@ -26,12 +37,16 @@ chain = [
 print("Verifikasi chain migration Fase 0 + Fase 1:")
 all_ok = True
 for name, expected_down in chain:
-    filepath = os.path.join(VERSIONS_DIR, f"{name}.py")
+    filepath = os.path.abspath(os.path.join(VERSIONS_DIR, f"{name}.py"))
     if not os.path.exists(filepath):
         print(f"  ✗ FILE NOT FOUND: {filepath}")
         all_ok = False
         continue
     spec = importlib.util.spec_from_file_location(name, filepath)
+    if spec is None or spec.loader is None:
+        print(f"  ✗ COULD NOT LOAD SPEC: {filepath}")
+        all_ok = False
+        continue
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     got = getattr(mod, "down_revision", "MISSING")
@@ -44,3 +59,4 @@ for name, expected_down in chain:
 
 print()
 print("✓ Semua chain valid" if all_ok else "✗ Ada chain yang rusak")
+
