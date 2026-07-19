@@ -22,7 +22,9 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 revision: str = "009"
-down_revision: str | None = "006"  # [GAP F1-1] Chain fix: 007 & 008 dibuat Fase 1
+down_revision: str | None = "008"  # [CHAIN FIX Fase 1] down_revision diubah dari "006" ke "008"
+# Migration 007 (papers) dan 008 (search_results) disisipkan di antara 006 dan 009.
+# Perubahan ini dilakukan di Fase 1 STEP 1 — tidak ada data yang di-migrate.
 branch_labels: str | None = None
 depends_on: str | None = None
 

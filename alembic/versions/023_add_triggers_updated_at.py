@@ -8,13 +8,20 @@
 #             payment_transactions, projects, stage_runs,
 #             stage_outputs, feature_flags
 #
+#           Tabel Fase 1 dengan updated_at (1 tabel):
+#             papers  ← ditambahkan di Fase 1 STEP 1 (Gap F1-2 resolution)
+#
 #           Tabel Fase 0 TANPA updated_at (tidak perlu trigger):
 #             institutional_seats (hanya assigned_at)
 #             citation_style_mappings (hanya created_at)
 #             prompt_versions (hanya created_at)
 #             analytics_events (hanya created_at — partitioned table)
 #
-#           Tabel Fase 1+ akan mendapat trigger saat tabel dibuat.
+#           Tabel Fase 1 TANPA updated_at (append-only):
+#             search_results (hanya created_at)
+#             search_sessions (hanya created_at)
+#
+#           Tabel Fase 1+ lainnya akan mendapat trigger saat tabel dibuat.
 #
 # Revision: 023
 # Fase    : Fase 0
@@ -30,8 +37,11 @@ down_revision: str | None = "022"
 branch_labels: str | None = None
 depends_on: str | None = None
 
-# Tabel Fase 0 yang memiliki kolom updated_at
+# Tabel dengan kolom updated_at yang memerlukan trigger set_updated_at()
+# Fase 0 (8 tabel) + Fase 1 (1 tabel: papers)
+# search_results dan search_sessions tidak perlu trigger (append-only, tidak ada updated_at)
 TABLES_WITH_UPDATED_AT: list[str] = [
+    # Fase 0
     "users",
     "institutional_accounts",
     "subscriptions",
@@ -40,6 +50,8 @@ TABLES_WITH_UPDATED_AT: list[str] = [
     "stage_runs",
     "stage_outputs",
     "feature_flags",
+    # Fase 1 (Gap F1-2 resolution) — ditambahkan Fase 1 STEP 1
+    "papers",
 ]
 
 

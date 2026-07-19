@@ -30,6 +30,9 @@ from __future__ import annotations
 import os
 import sys
 
+import sqlalchemy as sa
+from sqlalchemy import text as sa_text
+
 from alembic import op
 
 revision: str = "024"
@@ -62,7 +65,27 @@ def upgrade() -> None:
     # PART B — Row Level Security (RLS) Policies
     # Infrastructure as Code: semua RLS di-manage via Alembic
     # Ref: Supabase Auth — user JWT berisi auth.uid() = supabase_id
+    #
+    # GUARD: RLS hanya di-apply jika role 'authenticated' sudah ada.
+    # Di local PostgreSQL (non-Supabase), role ini tidak ada — skip PART B.
+    # Di Supabase (staging/production), role ini selalu ada.
     # ═══════════════════════════════════════════════════════════════════════
+    bind = op.get_bind()
+    result = bind.execute(
+        sa_text("SELECT 1 FROM pg_roles WHERE rolname = 'authenticated'")
+    )
+    has_authenticated_role = result.fetchone() is not None
+
+    if not has_authenticated_role:
+        # Local dev environment — skip RLS setup
+        # RLS akan aktif saat deploy ke Supabase staging via Railway
+        import warnings
+        warnings.warn(
+            "[migration 024] Role 'authenticated' tidak ada — skipping PART B RLS. "
+            "Ini normal di local PostgreSQL (non-Supabase).",
+            stacklevel=2,
+        )
+        return
 
     # ── Enable RLS pada semua tabel user-facing ───────────────────────────
     user_facing_tables = [
@@ -76,6 +99,7 @@ def upgrade() -> None:
     ]
     for table in user_facing_tables:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+
 
     # ── Tabel: users ──────────────────────────────────────────────────────
     # User hanya bisa membaca dan mengupdate data diri sendiri.

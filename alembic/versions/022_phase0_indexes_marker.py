@@ -41,7 +41,8 @@
 from __future__ import annotations
 
 revision: str = "022"
-down_revision: str | None = "017"
+down_revision: str | None = "018"  # [CHAIN FIX Fase 1] diubah dari "017" ke "018"
+# Migration 018 (search_sessions) disisipkan antara 017 dan 022 di Fase 1 STEP 1.
 branch_labels: str | None = None
 depends_on: str | None = None
 
