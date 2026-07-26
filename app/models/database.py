@@ -175,7 +175,7 @@ class User(Base):
     search_sessions: Mapped[list["SearchSession"]] = relationship(
         "SearchSession",
         back_populates="user",
-        order_by="SearchSession.created_at desc",  # [FIX] SQL-style string, bukan Python expr
+        order_by="SearchSession.created_at.desc()",  # [FIX v2] SQLAlchemy 2.x: gunakan .desc() expression
     )
 
     def __repr__(self) -> str:
