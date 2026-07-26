@@ -2,8 +2,18 @@
 # File    : docker-compose.yml
 # Desc    : Local development stack — API + Worker + Beat + Redis + PostgreSQL.
 #           Untuk production deployment, gunakan Railway (backend) — bukan compose.
-# Step    : STEP 3 — Backend Setup
-# Ref     : Blueprint §2.1, Project Master Document Fase 0
+#
+#           Worker concurrency sesuai Blueprint §18.4:
+#             worker-pipeline : queue pipeline_normal + pipeline_heavy, concurrency=4
+#             worker-chat     : queue chat_realtime, concurrency=6
+#             beat            : beat scheduler (satu instance saja)
+#
+#           Quick start:
+#             docker-compose up                    # semua services
+#             docker-compose up postgres redis api  # API saja tanpa worker
+#
+# Step    : STEP 3 (skeleton) → STEP 7 (queue routing complete)
+# Ref     : Blueprint §2.1, §18.4, Project Master Document Fase 0
 # ═══════════════════════════════════════════════════════════════════════════
 
 version: "3.9"
@@ -63,12 +73,14 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
 
-  # ── Celery Worker ─────────────────────────────────────────────────────
-  worker:
+  # ── Celery Worker: Pipeline (normal + heavy) ──────────────────────────
+  # Blueprint §18.4: pipeline_normal (P1–P6, P8) + pipeline_heavy (P7 SLR)
+  # Concurrency=4 — max 4 pipeline berjalan bersamaan (balanced CPU/memory)
+  worker-pipeline:
     build:
       context: .
       target: worker
-    container_name: miselia-worker
+    container_name: miselia-worker-pipeline
     env_file:
       - .env
     environment:
@@ -81,10 +93,46 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    command: >-
+      celery -A app.workers.celery_app worker
+      --queues=pipeline_normal,pipeline_heavy
+      --concurrency=4
+      --loglevel=info
+      --hostname=worker-pipeline@%h
+    restart: unless-stopped
+
+  # ── Celery Worker: Chat Realtime ───────────────────────────────────────
+  # Blueprint §18.4: chat_realtime — latency-sensitive, user menunggu sinkron
+  # Concurrency=6 — lebih tinggi untuk minimize queue depth
+  worker-chat:
+    build:
+      context: .
+      target: worker
+    container_name: miselia-worker-chat
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/miselia_dev
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >-
+      celery -A app.workers.celery_app worker
+      --queues=chat_realtime
+      --concurrency=6
+      --loglevel=info
+      --hostname=worker-chat@%h
     restart: unless-stopped
 
   # ── Celery Beat (scheduler) ───────────────────────────────────────────
+  # PENTING: Hanya boleh satu instance beat — duplicate akan menyebabkan
+  # double-execution scheduled jobs (subscription expiry, cleanup, dll)
+  # Ref: Blueprint §2.2 beat schedule, Decision #1
   beat:
     build:
       context: .
@@ -96,10 +144,14 @@ services:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/miselia_dev
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - worker
+      worker-pipeline:
+        condition: service_started
     volumes:
       - .:/app
-    command: celery -A app.workers.celery_app beat --loglevel=info --scheduler celery.beat.PersistentScheduler
+    command: >-
+      celery -A app.workers.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat.PersistentScheduler
     restart: unless-stopped
 
 volumes:

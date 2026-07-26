@@ -17,7 +17,7 @@
 #
 # Layer   : Workers / Celery
 # Deps    : celery, redis, app.config
-# Step    : STEP 7 — Health Check & Celery Skeleton
+# Step    : STEP 3 (skeleton) → STEP 7 (queue routing complete, Fase 1)
 # Ref     : Blueprint §2.2, §18.4, Decision #1, §6.15 (create_monthly_partition)
 # ═══════════════════════════════════════════════════════════════════════════
 
