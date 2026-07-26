@@ -2,18 +2,25 @@
 # File    : app/services/paper_service.py
 # Desc    : Paper service — business logic layer untuk fetch, dedup, dan ranking.
 #
-#           STEP 3 (bagian core) mencakup:
-#             - compute_title_hash()         → SHA-256 fingerprint untuk dedup
-#             - merge_and_dedup()            → deduplikasi S2 + OA, merge strategy
-#             - calculate_relevance_score()  → ranking sesuai Blueprint §3.3
-#             - check_s2_rate_limit()        → Redis sliding window untuk S2 API
+#           STEP 3 (core) mencakup:
+#             - compute_title_hash()           → SHA-256 fingerprint untuk dedup
+#             - merge_and_dedup()              → deduplikasi S2 + OA, merge strategy
+#             - calculate_relevance_score()    → ranking sesuai Blueprint §3.3
+#             - check_s2_rate_limit()          → Redis sliding window untuk S2 API
 #             - fetch_papers_with_resilience() → parallel fetch S2+OA dengan fallback
 #
-#           STEP 4 (belum diimplementasikan di file ini) akan menambahkan:
-#             - get_cached_or_fetch()        → Redis cache layer (TTL 24 jam)
-#             - should_run_query_translation() / augment_query_with_mapping()
-#             - validate_paper_count()
-#             - fetch_and_rank()             → fungsi utama yang dipanggil find_papers_service
+#           STEP 4 (extended) mencakup:
+#             - _build_cache_key()             → deterministic Redis key untuk paper cache
+#             - get_cached_or_fetch()          → Redis cache layer (TTL: PAPER_CACHE_TTL)
+#             - dedup_single_list()            → dedup satu list (untuk augmented results)
+#             - COLD_START_THRESHOLD, MIN_PAPERS_FOR_RUN → threshold Blueprint §19.2–19.5
+#             - INDONESIAN_MARKERS             → heuristic trigger cold start check
+#             - INDONESIAN_CONCEPT_MAPPING     → mapping UMKM→SME, dll (Blueprint §19.3)
+#             - PROMPT_0_QUERY_TRANSLATION     → template prompt terjemahan (Blueprint §19.2)
+#             - should_run_query_translation() → cek apakah perlu query translation
+#             - augment_query_with_mapping()   → replace keyword lokal dengan ekuivalen
+#             - validate_paper_count()         → graceful degradation + augmentasi
+#             - fetch_and_rank()               → fungsi utama dipanggil find_papers_service
 #
 #           PENTING — Separation of concerns:
 #             - integrations/semantic_scholar.py & openalex.py → HTTP client saja
@@ -22,25 +29,26 @@
 #             - check_s2_rate_limit() di sini → S2 API sliding window (berbeda!)
 #
 # Layer   : Services / Paper
-# Deps    : asyncio, hashlib, math, redis.asyncio, app.core.logging,
+# Deps    : asyncio, hashlib, json, math, redis.asyncio, app.core.logging,
 #           app.integrations.semantic_scholar, app.integrations.openalex
-# Step    : STEP 3 — Fase 1
-# Ref     : Blueprint §3.3, §18.1, §18.2, §18.5
+# Step    : STEP 3 + STEP 4 — Fase 1
+# Ref     : Blueprint §3.3, §18.1, §18.2, §18.3, §18.5, §19.2–19.5
 # ═══════════════════════════════════════════════════════════════════════════
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import math
 import re
-import string
 import time
 from typing import Any
 
 import redis.asyncio as aioredis
 
 from app.config import settings
+from app.core.exceptions import InsufficientPapersError
 from app.core.logging import get_logger
 from app.integrations.openalex import fetch_from_openalex
 from app.integrations.semantic_scholar import fetch_from_semantic_scholar
@@ -233,6 +241,510 @@ def merge_and_dedup(
 
     return merged
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4: Redis Cache Layer + Indonesian Query Strategy + Graceful Degradation
+# Ref: Blueprint §18.3, §19.2–19.5
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Threshold Constants ───────────────────────────────────────────────────────
+# Nilai verbatim dari Blueprint §19.2 dan §19.5
+
+COLD_START_THRESHOLD: int = 5
+# Minimum paper relevan sebelum cold start strategy dipicu.
+# < 5 paper tidak cukup untuk menghasilkan lit review yang koheren.
+# Ref: Blueprint §19.2
+
+MIN_PAPERS_FOR_RUN: int = 5
+# Minimum paper yang harus ada agar pipeline bisa berjalan.
+# Jika masih < 5 setelah augmentasi → raise InsufficientPapersError.
+# Ref: Blueprint §19.5
+
+
+# ── Indonesian Cold Start Detection ──────────────────────────────────────────
+# Verbatim dari Blueprint §19.2 — daftar kata penanda konteks lokal Indonesia.
+# Dipakai oleh should_run_query_translation() sebagai heuristic trigger.
+
+INDONESIAN_MARKERS: list[str] = [
+    "umkm", "bumdes", "kelurahan", "kecamatan", "desa", "kabupaten",
+    "provinsi", "daerah", "lokal", "nasional", "indonesia", "jawa",
+    "bali", "sumatera", "sulawesi", "kalimantan", "papua", "ntt", "nusa tenggara",
+    "batik", "wayang", "adat", "pesantren", "madrasah",
+]
+
+
+# ── Indonesian Concept Mapping ────────────────────────────────────────────────
+# Verbatim dari Blueprint §19.3 — mapping istilah lokal Indonesia ke ekuivalen
+# akademik internasional. Dipakai oleh augment_query_with_mapping().
+
+INDONESIAN_CONCEPT_MAPPING: dict[str, list[str]] = {
+    # Institusi & organisasi
+    "umkm": ["SME", "small medium enterprise", "micro enterprise", "informal economy"],
+    "bumdes": ["village enterprise", "rural cooperative", "community enterprise"],
+    "pesantren": ["Islamic boarding school", "religious education institution"],
+    "koperasi": ["cooperative", "credit union", "mutual organization"],
+
+    # Konsep sosial-ekonomi
+    "ketahanan pangan": ["food security", "food resilience"],
+    "kemiskinan": ["poverty", "income inequality", "livelihood"],
+    "pemberdayaan masyarakat": ["community empowerment", "social capital", "capacity building"],
+    "otonomi daerah": ["regional autonomy", "decentralization", "local governance"],
+
+    # Pendidikan
+    "kurikulum merdeka": ["student-centered curriculum", "competency-based education"],
+    "pembelajaran daring": ["online learning", "e-learning", "distance education"],
+
+    # Pariwisata
+    "wisata halal": ["halal tourism", "Muslim-friendly tourism"],
+    "desa wisata": ["rural tourism", "village tourism", "agrotourism"],
+
+    # Teknologi & digital
+    "fintech syariah": ["Islamic fintech", "sharia-compliant financial technology"],
+    "e-commerce lokal": ["local e-commerce", "digital marketplace", "platform economy"],
+}
+
+
+# ── Prompt Template Query Translation ────────────────────────────────────────
+# Verbatim dari Blueprint §19.2 — dipakai oleh pipeline P1/P2 untuk
+# menerjemahkan topik lokal Indonesia ke query akademik internasional.
+# Belum dipanggil di STEP 4 — hanya didefinisikan sebagai string konstanta.
+# Curly braces double-escaped {{ }} karena string ini adalah f-string template
+# yang akan di-format oleh caller saat pemanggilan OpenAI.
+
+PROMPT_0_QUERY_TRANSLATION: str = """\
+Kamu adalah asisten penelitian yang ahli dalam menerjemahkan topik penelitian lokal
+menjadi query pencarian paper akademik internasional yang efektif.
+
+Topik penelitian: {topic}
+Bidang studi: {field_of_study}
+Konteks: Topik ini ditulis dalam konteks Indonesia dan mungkin memiliki nama lokal
+yang perlu diterjemahkan atau diabstraksikan ke konsep universal.
+
+Tugasmu:
+1. Identifikasi konsep inti dari topik (terlepas dari konteks lokal)
+2. Terjemahkan ke istilah akademik dalam Bahasa Inggris yang umum digunakan
+   dalam literatur internasional
+3. Sertakan keyword lokal sebagai konteks (dalam bahasa aslinya) untuk filter
+   jika tersedia paper yang membahas konteks ASEAN atau Asia Tenggara
+
+Output HANYA JSON:
+{{
+  "core_concepts": ["concept 1", "concept 2", "concept 3"],
+  "english_translation": "abstracted topic in English academic terms",
+  "local_keywords": ["keyword lokal 1", "keyword lokal 2"],
+  "suggested_queries_en": [
+    "broad query in English",
+    "specific query with methodology",
+    "Southeast Asia context query"
+  ],
+  "local_context_note": "Apakah ada ekuivalen konsep internasional yang langsung? (y/n + penjelasan)"
+}}
+"""
+
+
+# ── Redis Cache: Private Key Builder ─────────────────────────────────────────
+
+
+def _build_cache_key(query: str, filters: dict[str, Any]) -> str:
+    """
+    Buat cache key yang deterministic untuk paper cache Redis.
+
+    Formula: f"paper_cache:{SHA-256(query + json(filters, sort_keys=True))[:16]}"
+
+    Gap P4-6 resolution: json.dumps dengan sort_keys=True menggantikan
+    str(sorted(filters.items())) dari Blueprint — lebih reliable untuk
+    nested structures (list/dict sebagai value).
+
+    Args:
+        query: Query string yang dikirim ke API
+        filters: Dict filter (year_from, year_to, dll)
+
+    Returns:
+        String key Redis dalam format "paper_cache:{16-char hex}"
+
+    Ref: Blueprint §18.3
+    """
+    filters_str = json.dumps(filters, sort_keys=True, default=str)
+    raw = query + filters_str
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+    return f"paper_cache:{digest}"
+
+
+# ── Redis Cache: Get-or-Fetch ─────────────────────────────────────────────────
+
+
+async def get_cached_or_fetch(
+    query: str,
+    filters: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """
+    Check Redis cache sebelum hit API eksternal.
+
+    Strategy (sesuai Blueprint §18.3):
+      Cache hit  → return parsed JSON + log paper_cache_hit
+      Cache miss → fetch_papers_with_resilience → simpan ke Redis → return
+
+    TTL: settings.PAPER_CACHE_TTL (default 86400 = 24 jam)
+    Cache key: _build_cache_key(query, filters) → 16-char SHA-256 prefix
+
+    Gap P4-1 resolution: semua Redis call menggunakan await (async API).
+    Gap P4-2 resolution: log paper_cache_hit via structlog, bukan track_event().
+    Fail-open: jika Redis error → langsung fetch, tidak crash.
+
+    Args:
+        query: Query string utama
+        filters: Dict filter yang dipakai saat fetch
+
+    Returns:
+        List paper dalam schema internal Miselia
+
+    Ref: Blueprint §18.3
+    """
+    cache_key = _build_cache_key(query, filters)
+    redis = _get_redis()
+
+    # ── Cache check ───────────────────────────────────────────────────
+    try:
+        cached_raw: str | None = await redis.get(cache_key)
+        if cached_raw:
+            logger.info(
+                "paper_cache_hit",
+                query_prefix=query[:30],
+                cache_key=cache_key,
+            )
+            return json.loads(cached_raw)
+    except Exception as exc:
+        # Redis read error → fail-open, lanjut ke fetch
+        logger.warning(
+            "paper_cache_read_error",
+            error=str(exc),
+            action="proceed_to_fetch",
+        )
+
+    # ── Cache miss → fetch ────────────────────────────────────────────
+    results = await fetch_papers_with_resilience(
+        optimized_queries=[query],
+        filters=filters,
+        max_candidates=100,
+        pipeline="cached_fetch",
+    )
+
+    # ── Simpan ke cache ───────────────────────────────────────────────
+    try:
+        await redis.setex(
+            cache_key,
+            settings.PAPER_CACHE_TTL,
+            json.dumps(results),
+        )
+        logger.info(
+            "paper_cache_miss_stored",
+            query_prefix=query[:30],
+            result_count=len(results),
+            ttl=settings.PAPER_CACHE_TTL,
+        )
+    except Exception as exc:
+        # Redis write error → tidak fatal, hasil tetap dikembalikan
+        logger.warning(
+            "paper_cache_write_error",
+            error=str(exc),
+        )
+
+    return results
+
+
+# ── Dedup Tunggal (Private) ───────────────────────────────────────────────────
+
+
+def _dedup_single_list(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Deduplikasi satu list paper menggunakan DOI-first + title_hash fallback.
+
+    Diperlukan oleh validate_paper_count() dan fetch_and_rank() untuk dedup
+    setelah menggabungkan hasil augmented fetch dengan hasil awal.
+    Berbeda dari merge_and_dedup() yang menerima dua list terpisah (S2 vs OA).
+
+    Strategy:
+      - Loop paper → skip jika doi atau title_hash sudah terlihat
+      - Pertahankan urutan (paper pertama menang — biasanya lebih relevan)
+
+    Gap P4-3 resolution: fungsi ini menggantikan deduplicate() yang tidak ada
+    di Blueprint §19.5.
+
+    Args:
+        papers: List paper dalam schema internal Miselia
+
+    Returns:
+        List paper yang sudah di-dedup, urutan asli dipertahankan
+    """
+    seen_doi: set[str] = set()
+    seen_hash: set[str] = set()
+    result: list[dict[str, Any]] = []
+
+    for paper in papers:
+        doi = paper.get("doi")
+        title = paper.get("title", "")
+        year = paper.get("year")
+        th = compute_title_hash(title, year)
+
+        if doi and doi in seen_doi:
+            continue
+        if th in seen_hash:
+            continue
+
+        if doi:
+            seen_doi.add(doi)
+        seen_hash.add(th)
+        result.append(paper)
+
+    return result
+
+
+# ── Indonesian Cold Start: Detection ─────────────────────────────────────────
+
+
+def should_run_query_translation(
+    topic: str,
+    field_of_study: str,
+    initial_result_count: int = 0,
+) -> bool:
+    """
+    Tentukan apakah perlu menjalankan Prompt 0 (Query Translation) untuk topik.
+
+    Trigger kondisi (sesuai Blueprint §19.2 VERBATIM):
+      1. initial_result_count < COLD_START_THRESHOLD
+         → trigger paling reliable, tidak butuh heuristic string
+      2. ATAU topic mengandung kata dari INDONESIAN_MARKERS
+         → topik sangat lokal, kemungkinan besar cold start
+
+    Args:
+        topic: Topik penelitian dari user (bisa Bahasa Indonesia atau Inggris)
+        field_of_study: Bidang studi (tersedia untuk konteks future use)
+        initial_result_count: Jumlah paper relevan dari fetch awal
+
+    Returns:
+        True  → jalankan query translation sebelum retry
+        False → tidak perlu (hasil awal sudah cukup)
+
+    Ref: Blueprint §19.2
+    """
+    # Trigger 1: result count terlalu sedikit (paling reliable)
+    if initial_result_count < COLD_START_THRESHOLD:
+        return True
+
+    # Trigger 2: heuristic string matching — topik sangat lokal
+    topic_lower = topic.lower()
+    return any(marker in topic_lower for marker in INDONESIAN_MARKERS)
+
+
+# ── Indonesian Cold Start: Query Augmentation ─────────────────────────────────
+
+
+def augment_query_with_mapping(topic: str) -> list[str]:
+    """
+    Replace atau augmentasi keyword lokal Indonesia dengan ekuivalen akademik
+    internasional menggunakan INDONESIAN_CONCEPT_MAPPING.
+
+    Strategy (sesuai Blueprint §19.3 VERBATIM):
+      - Cari setiap indo_term dalam topic (case-insensitive via .lower())
+      - Jika ditemukan: buat augmented query dengan replace term → ekuivalen
+      - Maksimum 2 ekuivalen per term ([:2])
+      - Return [topic] jika tidak ada match (original sebagai fallback)
+
+    Args:
+        topic: Topik penelitian dari user
+
+    Returns:
+        List query yang sudah di-augmentasi.
+        Return [topic] jika tidak ada keyword lokal yang ditemukan.
+
+    Ref: Blueprint §19.3
+    """
+    augmented: list[str] = []
+    topic_lower = topic.lower()
+
+    for indo_term, en_equivalents in INDONESIAN_CONCEPT_MAPPING.items():
+        if indo_term in topic_lower:
+            for en_term in en_equivalents[:2]:  # max 2 ekuivalen per term
+                augmented_query = topic_lower.replace(indo_term, en_term)
+                augmented.append(augmented_query)
+
+    return augmented if augmented else [topic]
+
+
+# ── Graceful Degradation: Validate Paper Count ───────────────────────────────
+
+
+async def validate_paper_count(
+    papers: list[dict[str, Any]],
+    stage_type: str,
+    topic: str,
+    filters: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Validasi jumlah paper setelah fetch, sebelum LLM synthesis.
+    Mencoba augmentasi query jika paper terlalu sedikit.
+
+    Strategy (sesuai Blueprint §19.5, dengan perbaikan Gap P4-3, P4-4):
+      Jika len(papers) < MIN_PAPERS_FOR_RUN:
+        1. stage_type in {'literature_review', 'systematic_review'}:
+           → augment_query_with_mapping(topic)
+           → fetch additional (max 50 candidates)
+           → _dedup_single_list(papers + additional)
+        2. Jika masih < MIN_PAPERS_FOR_RUN: raise InsufficientPapersError
+
+    Gap P4-4 resolution: return list[dict] bukan mutate-in-place.
+      Caller HARUS menggunakan return value:
+        papers = await validate_paper_count(papers, ...)
+
+    Gap P4-3 resolution: _dedup_single_list() menggantikan deduplicate()
+      yang tidak ada di Blueprint asli.
+
+    Args:
+        papers: List paper yang sudah di-fetch
+        stage_type: Tipe stage pipeline ('literature_review', dll)
+        topic: Topik penelitian (untuk augmentasi dan pesan error)
+        filters: Filter yang dipakai saat fetch awal (untuk retry augmented)
+
+    Returns:
+        List paper final (sudah di-augment dan di-dedup jika perlu)
+
+    Raises:
+        InsufficientPapersError: jika paper < MIN_PAPERS_FOR_RUN setelah augmentasi
+
+    Ref: Blueprint §19.5
+    """
+    # Mutable default fix — jangan pakai {} sebagai default argument (Gap P4-7 style)
+    safe_filters: dict[str, Any] = filters if filters is not None else {}
+
+    if len(papers) < MIN_PAPERS_FOR_RUN:
+        if stage_type in {"literature_review", "systematic_review"}:
+            augmented_queries = augment_query_with_mapping(topic)
+            logger.info(
+                "validate_paper_count_augmenting",
+                initial_count=len(papers),
+                stage_type=stage_type,
+                augmented_queries=augmented_queries[:2],
+            )
+
+            additional = await fetch_papers_with_resilience(
+                optimized_queries=augmented_queries,
+                filters=safe_filters,
+                max_candidates=50,
+                pipeline="narrative",
+            )
+
+            # Dedup gabungan: papers awal + augmented results
+            papers = _dedup_single_list(papers + additional)
+
+            logger.info(
+                "validate_paper_count_after_augment",
+                count_after=len(papers),
+                additional_found=len(additional),
+            )
+
+    # Final check setelah augmentasi (atau tanpa augmentasi jika stage type lain)
+    if len(papers) < MIN_PAPERS_FOR_RUN:
+        raise InsufficientPapersError(
+            paper_count=len(papers),
+            topic=topic,
+            suggestions=[
+                "Coba perluas topik ke konsep yang lebih umum",
+                "Gunakan istilah Bahasa Inggris jika topik sangat spesifik",
+                "Kurangi batasan tahun — coba mulai dari 2000 jika sebelumnya 2015+",
+            ],
+        )
+
+    return papers
+
+
+# ── Fungsi Utama: Fetch → Cache → Augment → Rank ─────────────────────────────
+
+
+async def fetch_and_rank(
+    query: str,
+    filters: dict[str, Any],
+    query_terms: list[str],
+    field_of_study: str = "",
+    max_candidates: int = 100,
+) -> list[dict[str, Any]]:
+    """
+    Fungsi utama paper service — dipanggil oleh find_papers_service (STEP 6).
+
+    Orchestrasi:
+      1. get_cached_or_fetch(query, filters)
+         → cek Redis cache, fetch dari S2+OA jika miss
+      2. Cold start check via should_run_query_translation()
+         → jika triggered: augment_query_with_mapping(query)
+         → fetch additional dengan augmented queries
+         → _dedup_single_list(papers + additional)
+      3. calculate_relevance_score() untuk setiap paper → tambahkan ke dict
+      4. Sort descending by relevance_score
+      5. Return list terurut
+
+    Gap P4-5 resolution: field_of_study sebagai parameter opsional
+      untuk diteruskan ke should_run_query_translation() — trigger utama
+      saat ini berbasis result count, field_of_study untuk future extension.
+
+    Args:
+        query: Query string utama (sudah dioptimasi oleh find_papers_service)
+        filters: Dict FindPapersFilters (year_from, year_to, dll)
+        query_terms: List kata untuk relevance scoring (lowercase)
+        field_of_study: Bidang studi untuk konteks cold start (opsional)
+        max_candidates: Maksimum kandidat paper per fetch
+
+    Returns:
+        List paper terurut by relevance_score descending.
+        Field 'relevance_score' (float 0.0–1.0) ditambahkan ke setiap paper dict.
+
+    Ref: Blueprint §3.3, §18.3, §19.2–19.4
+    """
+    # ── Step 1: Get from cache atau fetch fresh ───────────────────────
+    papers = await get_cached_or_fetch(query, filters)
+
+    # ── Step 2: Cold start augmentation jika hasil terlalu sedikit ────
+    if should_run_query_translation(
+        topic=query,
+        field_of_study=field_of_study,
+        initial_result_count=len(papers),
+    ):
+        logger.info(
+            "fetch_and_rank_cold_start_triggered",
+            initial_count=len(papers),
+            query_prefix=query[:50],
+        )
+        augmented_queries = augment_query_with_mapping(query)
+
+        # Fetch dengan augmented queries (max_candidates // 2 untuk hemat quota)
+        additional = await fetch_papers_with_resilience(
+            optimized_queries=augmented_queries,
+            filters=filters,
+            max_candidates=max(50, max_candidates // 2),
+            pipeline="cold_start_augment",
+        )
+
+        if additional:
+            papers = _dedup_single_list(papers + additional)
+            logger.info(
+                "fetch_and_rank_augment_complete",
+                final_count=len(papers),
+                additional_found=len(additional),
+            )
+
+    # ── Step 3: Calculate relevance score dan tambahkan ke dict ───────
+    for paper in papers:
+        paper["relevance_score"] = calculate_relevance_score(paper, query_terms)
+
+    # ── Step 4: Sort descending — paper paling relevan di atas ────────
+    papers.sort(key=lambda p: p["relevance_score"], reverse=True)
+
+    logger.info(
+        "fetch_and_rank_complete",
+        total_papers=len(papers),
+        query_prefix=query[:50],
+        top_score=papers[0]["relevance_score"] if papers else 0.0,
+    )
+
+    return papers
 
 # ── Core: Relevance Scoring ───────────────────────────────────────────────
 
