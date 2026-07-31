@@ -52,14 +52,14 @@ logger = get_logger(__name__)
 
 MODERATION_HARD_BLOCK: dict[str, float] = {
     "harassment/threatening": 0.8,
-    "self-harm":              0.8,
-    "self-harm/intent":       0.7,
+    "self-harm": 0.8,
+    "self-harm/intent": 0.7,
     "self-harm/instructions": 0.7,
 }
 
 MODERATION_LOG_ONLY: dict[str, float] = {
     "harassment": 0.5,
-    "violence":   0.6,
+    "violence": 0.6,
 }
 
 

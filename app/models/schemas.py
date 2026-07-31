@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
 # ════════════════════════════════════════════════════════════════════════════
 # FIND PAPERS — Schemas
 # Ref: Blueprint §3.2 VERBATIM

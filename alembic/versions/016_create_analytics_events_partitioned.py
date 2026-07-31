@@ -38,7 +38,8 @@ def upgrade() -> None:
     # Tidak bisa menggunakan op.create_table() — harus raw SQL
     # Primary key: (id, created_at) karena PostgreSQL mensyaratkan partition key
     # harus ada di primary key atau unique constraint untuk partitioned tables
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE analytics_events (
             id          UUID NOT NULL DEFAULT gen_random_uuid(),
             user_id     UUID REFERENCES users(id),
@@ -48,46 +49,59 @@ def upgrade() -> None:
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             PRIMARY KEY (id, created_at)
         ) PARTITION BY RANGE (created_at)
-    """)
+    """
+    )
 
     # ── Partisi awal: 3 bulan ke depan ────────────────────────────────────
     # Blueprint §6.15: "buat minimal 3 bulan ke depan saat launch"
     # Query FAIL jika tidak ada partisi matching — jangan skip ini
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE analytics_events_2026_03
         PARTITION OF analytics_events
         FOR VALUES FROM ('2026-03-01') TO ('2026-04-01')
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE analytics_events_2026_04
         PARTITION OF analytics_events
         FOR VALUES FROM ('2026-04-01') TO ('2026-05-01')
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE analytics_events_2026_05
         PARTITION OF analytics_events
         FOR VALUES FROM ('2026-05-01') TO ('2026-06-01')
-    """)
+    """
+    )
 
     # ── Indexes ────────────────────────────────────────────────────────────
     # Index pada parent table — PostgreSQL otomatis propagate ke semua partisi
     # Ref: Blueprint Appendix E
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_analytics_events_user_id
         ON analytics_events(user_id)
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_analytics_events_event_name
         ON analytics_events(event_name)
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_analytics_events_created_at
         ON analytics_events(created_at DESC)
-    """)
+    """
+    )
 
 
 def downgrade() -> None:

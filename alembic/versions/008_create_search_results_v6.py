@@ -102,21 +102,25 @@ def upgrade() -> None:
     # ── Partial indexes via raw SQL ───────────────────────────────────────
     # idx_search_results_stage_run_id: filter rows dengan stage_run_id terisi
     # Partial index untuk efisiensi — skip baris library push (stage_run_id=NULL)
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_search_results_stage_run_id
         ON search_results(stage_run_id)
         WHERE stage_run_id IS NOT NULL
-    """)
+    """
+    )
 
     # UNIQUE partial index — Gap F1-3 resolution:
     # Mencegah paper yang sama muncul dua kali dalam satu pipeline run.
     # NULL tidak dievaluasi oleh UNIQUE — partial WHERE clause diperlukan.
     # Baris library push (stage_run_id=NULL) tidak terpengaruh oleh index ini.
-    op.execute("""
+    op.execute(
+        """
         CREATE UNIQUE INDEX uq_search_results_stage_paper
         ON search_results(stage_run_id, paper_id)
         WHERE stage_run_id IS NOT NULL
-    """)
+    """
+    )
 
 
 def downgrade() -> None:

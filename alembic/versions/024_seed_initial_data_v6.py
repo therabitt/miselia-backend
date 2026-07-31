@@ -30,7 +30,6 @@ from __future__ import annotations
 import os
 import sys
 
-import sqlalchemy as sa
 from sqlalchemy import text as sa_text
 
 from alembic import op
@@ -71,15 +70,14 @@ def upgrade() -> None:
     # Di Supabase (staging/production), role ini selalu ada.
     # ═══════════════════════════════════════════════════════════════════════
     bind = op.get_bind()
-    result = bind.execute(
-        sa_text("SELECT 1 FROM pg_roles WHERE rolname = 'authenticated'")
-    )
+    result = bind.execute(sa_text("SELECT 1 FROM pg_roles WHERE rolname = 'authenticated'"))
     has_authenticated_role = result.fetchone() is not None
 
     if not has_authenticated_role:
         # Local dev environment — skip RLS setup
         # RLS akan aktif saat deploy ke Supabase staging via Railway
         import warnings
+
         warnings.warn(
             "[migration 024] Role 'authenticated' tidak ada — skipping PART B RLS. "
             "Ini normal di local PostgreSQL (non-Supabase).",
@@ -100,38 +98,44 @@ def upgrade() -> None:
     for table in user_facing_tables:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
 
-
     # ── Tabel: users ──────────────────────────────────────────────────────
     # User hanya bisa membaca dan mengupdate data diri sendiri.
     # Service role (backend FastAPI) bisa akses semua via service_role key.
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY users_select_own ON users
         FOR SELECT
         TO authenticated
         USING (supabase_id = auth.uid())
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY users_update_own ON users
         FOR UPDATE
         TO authenticated
         USING (supabase_id = auth.uid())
         WITH CHECK (supabase_id = auth.uid())
-    """)
+    """
+    )
 
     # INSERT ke users dilakukan hanya oleh service_role (backend saat POST /auth/verify)
     # Tidak ada policy INSERT untuk authenticated — backend menggunakan service_role key
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY users_insert_service ON users
         FOR INSERT
         TO service_role
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel: subscriptions ─────────────────────────────────────────────
     # User hanya bisa membaca subscription diri sendiri.
     # CREATE/UPDATE subscription hanya via service_role (backend payment webhook).
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY subscriptions_select_own ON subscriptions
         FOR SELECT
         TO authenticated
@@ -140,19 +144,23 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY subscriptions_all_service ON subscriptions
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel: projects ───────────────────────────────────────────────────
     # User hanya bisa CRUD project miliknya sendiri.
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY projects_select_own ON projects
         FOR SELECT
         TO authenticated
@@ -161,9 +169,11 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY projects_insert_own ON projects
         FOR INSERT
         TO authenticated
@@ -172,9 +182,11 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY projects_update_own ON projects
         FOR UPDATE
         TO authenticated
@@ -188,23 +200,27 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
     # DELETE projects tidak diizinkan — hanya archive via PATCH status='archived'
     # Tidak ada DELETE policy untuk authenticated user
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY projects_all_service ON projects
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel: stage_runs ─────────────────────────────────────────────────
     # User hanya bisa membaca stage_runs miliknya.
     # INSERT/UPDATE dilakukan via service_role (backend Celery worker).
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY stage_runs_select_own ON stage_runs
         FOR SELECT
         TO authenticated
@@ -213,9 +229,11 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY stage_runs_insert_own ON stage_runs
         FOR INSERT
         TO authenticated
@@ -224,21 +242,25 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
     # UPDATE dan status change hanya via service_role (Celery worker update progress/status)
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY stage_runs_all_service ON stage_runs
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel: stage_outputs ──────────────────────────────────────────────
     # User bisa SELECT output untuk stage_run miliknya.
     # INSERT/UPDATE hanya via service_role (Celery worker menyimpan output).
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY stage_outputs_select_own ON stage_outputs
         FOR SELECT
         TO authenticated
@@ -250,20 +272,24 @@ def upgrade() -> None:
                 )
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY stage_outputs_all_service ON stage_outputs
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel: payment_transactions ───────────────────────────────────────
     # User hanya bisa SELECT transaksi miliknya (untuk history pembayaran).
     # INSERT/UPDATE hanya via service_role (backend payment webhook handler).
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY payment_transactions_select_own ON payment_transactions
         FOR SELECT
         TO authenticated
@@ -272,20 +298,24 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY payment_transactions_all_service ON payment_transactions
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel: institutional_seats ────────────────────────────────────────
     # User bisa SELECT seat yang assigned ke dirinya.
     # INSERT/UPDATE/DELETE hanya via service_role (admin).
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY institutional_seats_select_own ON institutional_seats
         FOR SELECT
         TO authenticated
@@ -294,15 +324,18 @@ def upgrade() -> None:
                 SELECT id FROM users WHERE supabase_id = auth.uid()
             )
         )
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE POLICY institutional_seats_all_service ON institutional_seats
         FOR ALL
         TO service_role
         USING (true)
         WITH CHECK (true)
-    """)
+    """
+    )
 
     # ── Tabel global (read-only, tanpa RLS user-level) ────────────────────
     # citation_style_mappings, prompt_versions, feature_flags:

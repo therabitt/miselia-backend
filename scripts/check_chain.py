@@ -59,4 +59,3 @@ for name, expected_down in chain:
 
 print()
 print("✓ Semua chain valid" if all_ok else "✗ Ada chain yang rusak")
-

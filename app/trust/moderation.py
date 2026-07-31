@@ -26,7 +26,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.core.logging import get_logger
 
@@ -89,12 +89,8 @@ FLAGGED_PATTERNS: list[str] = [
 
 # Compile regex sekali saat modul di-import (performance optimization)
 # re.IGNORECASE — bahasa Indonesia tidak case-sensitive untuk kata-kata ini
-_compiled_blocked: list[re.Pattern[str]] = [
-    re.compile(p, re.IGNORECASE) for p in BLOCKED_PATTERNS
-]
-_compiled_flagged: list[re.Pattern[str]] = [
-    re.compile(p, re.IGNORECASE) for p in FLAGGED_PATTERNS
-]
+_compiled_blocked: list[re.Pattern[str]] = [re.compile(p, re.IGNORECASE) for p in BLOCKED_PATTERNS]
+_compiled_flagged: list[re.Pattern[str]] = [re.compile(p, re.IGNORECASE) for p in FLAGGED_PATTERNS]
 
 
 # ── moderate_query ────────────────────────────────────────────────────────────

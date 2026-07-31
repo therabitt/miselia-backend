@@ -65,11 +65,13 @@ def upgrade() -> None:
     # Partial UNIQUE index: satu versi aktif per (stage_type, prompt_name)
     # Mencegah multiple active prompts → non-deterministic prompt selection
     # Harus raw SQL — SQLAlchemy create_index tidak support partial unique index
-    op.execute("""
+    op.execute(
+        """
         CREATE UNIQUE INDEX idx_prompt_versions_one_active
         ON prompt_versions(stage_type, prompt_name)
         WHERE is_active = TRUE
-    """)
+    """
+    )
 
     # ── Tambahkan FK constraint ke stage_outputs.prompt_version_id ────────
     # FK ini tidak bisa dibuat di migration 009 karena tabel prompt_versions

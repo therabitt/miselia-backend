@@ -259,9 +259,9 @@ async def test_find_papers_authenticated_saves_session() -> None:
     from app.models.database import SearchSession
 
     added_obj = mock_db.add.call_args[0][0]
-    assert isinstance(added_obj, SearchSession), (
-        f"DB.add harus dipanggil dengan SearchSession, got: {type(added_obj)}"
-    )
+    assert isinstance(
+        added_obj, SearchSession
+    ), f"DB.add harus dipanggil dengan SearchSession, got: {type(added_obj)}"
     # paper_ids harus list of str (paper_id dari mock_papers)
     assert added_obj.paper_ids == [p["paper_id"] for p in mock_papers]
     assert added_obj.user_id == mock_user.id
@@ -392,9 +392,9 @@ async def test_find_papers_blocked_query() -> None:
 
     assert resp.status_code == 400, f"Expected 400, got {resp.status_code}: {resp.text}"
     body = resp.json()
-    assert body.get("error") == "content_policy_violation", (
-        f"Expected error=content_policy_violation, got: {body}"
-    )
+    assert (
+        body.get("error") == "content_policy_violation"
+    ), f"Expected error=content_policy_violation, got: {body}"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -417,15 +417,15 @@ async def test_find_papers_rate_limit_guest(
     from app.main import app
 
     call_count = 0
-    GUEST_LIMIT = 10
+    guest_limit = 10
 
     async def mock_rate_limit(limit_name: str, identifier: str) -> None:
         nonlocal call_count
         if limit_name == "guest_find_papers":
             call_count += 1
-            if call_count > GUEST_LIMIT:
+            if call_count > guest_limit:
                 raise RateLimitExceededError(
-                    message=f"Terlalu banyak request. Batas {GUEST_LIMIT} per jam."
+                    message=f"Terlalu banyak request. Batas {guest_limit} per jam."
                 )
 
     monkeypatch.setattr("app.api.v1.find_papers.check_rate_limit", mock_rate_limit)
@@ -441,15 +441,15 @@ async def test_find_papers_rate_limit_guest(
                 return_value=mock_papers,
             ):
                 # Request 1–10: harus berhasil
-                for i in range(GUEST_LIMIT):
+                for i in range(guest_limit):
                     resp = await client.post(
                         "/api/v1/papers/find",
                         json={"query": VALID_QUERY},
                         headers={"X-Forwarded-For": "1.2.3.4"},
                     )
-                    assert resp.status_code == 200, (
-                        f"Request ke-{i + 1} harus 200, got {resp.status_code}"
-                    )
+                    assert (
+                        resp.status_code == 200
+                    ), f"Request ke-{i + 1} harus 200, got {resp.status_code}"
 
                 # Request ke-11: harus 429
                 resp_429 = await client.post(
@@ -460,13 +460,13 @@ async def test_find_papers_rate_limit_guest(
     finally:
         app.dependency_overrides.clear()
 
-    assert resp_429.status_code == 429, (
-        f"Request ke-11 harus 429, got {resp_429.status_code}: {resp_429.text}"
-    )
+    assert (
+        resp_429.status_code == 429
+    ), f"Request ke-11 harus 429, got {resp_429.status_code}: {resp_429.text}"
     body = resp_429.json()
-    assert body.get("error") == "rate_limit_exceeded", (
-        f"Expected error=rate_limit_exceeded, got: {body}"
-    )
+    assert (
+        body.get("error") == "rate_limit_exceeded"
+    ), f"Expected error=rate_limit_exceeded, got: {body}"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -488,7 +488,7 @@ async def test_cache_hit_faster() -> None:
 
     mock_papers = _make_mock_papers(5)
     call_count = 0
-    SIMULATED_DELAY_S = 0.15  # 150ms simulasi network fetch
+    simulated_delay_s = 0.15  # 150ms simulasi network fetch
 
     async def mock_cached_or_fetch(
         query: str,
@@ -497,7 +497,7 @@ async def test_cache_hit_faster() -> None:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            await asyncio.sleep(SIMULATED_DELAY_S)  # Simulasi cold path
+            await asyncio.sleep(simulated_delay_s)  # Simulasi cold path
         return mock_papers  # Selanjutnya: cache hit (instant)
 
     client, _, _ = await _make_test_client_no_db(mock_user=None)
@@ -631,9 +631,7 @@ async def test_dedup_no_duplicate_doi() -> None:
     doi_list = [p["doi"] for p in body["papers"] if p["doi"] is not None]
     doi_set = set(doi_list)
 
-    assert len(doi_list) == len(doi_set), (
-        f"FAIL: ada DOI duplikat di response! doi_list={doi_list}"
-    )
+    assert len(doi_list) == len(doi_set), f"FAIL: ada DOI duplikat di response! doi_list={doi_list}"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -708,9 +706,9 @@ async def test_response_time_under_5s() -> None:
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["search_duration_ms"] < 5000, (
-        f"search_duration_ms harus < 5000ms, got: {body['search_duration_ms']}ms"
-    )
+    assert (
+        body["search_duration_ms"] < 5000
+    ), f"search_duration_ms harus < 5000ms, got: {body['search_duration_ms']}ms"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -730,14 +728,14 @@ async def test_parallel_fetch_faster_than_sequential() -> None:
     Pure unit test — tidak butuh test_client atau DB.
     Ref: Blueprint §14.0 (asyncio.gather untuk parallel fetch)
     """
-    DELAY_S = 0.15  # 150ms per source
+    delay_s = 0.15  # 150ms per source
 
     async def mock_fetch_s2(
         queries: list[str],
         filters: dict[str, Any],
         max_candidates: int,
     ) -> list[dict[str, Any]]:
-        await asyncio.sleep(DELAY_S)
+        await asyncio.sleep(delay_s)
         return [
             {
                 "paper_id": "s2-parallel-001",
@@ -759,7 +757,7 @@ async def test_parallel_fetch_faster_than_sequential() -> None:
         filters: dict[str, Any],
         max_candidates: int,
     ) -> list[dict[str, Any]]:
-        await asyncio.sleep(DELAY_S)
+        await asyncio.sleep(delay_s)
         return [
             {
                 "paper_id": "oa-parallel-001",
@@ -803,7 +801,7 @@ async def test_parallel_fetch_faster_than_sequential() -> None:
         t_end = time.monotonic()
 
     total_elapsed = t_end - t_start
-    sequential_estimate = DELAY_S * 2  # ~300ms jika sequential
+    sequential_estimate = delay_s * 2  # ~300ms jika sequential
 
     # Parallel: total < sequential_estimate * 1.5 (dengan async overhead)
     assert total_elapsed < sequential_estimate * 1.5, (
@@ -909,8 +907,7 @@ async def test_relevance_sorted_descending() -> None:
     # Verifikasi endpoint preserves urutan descending dari fetch_and_rank
     scores = [p["relevance_score"] for p in papers]
     assert scores == sorted(scores, reverse=True), (
-        f"Endpoint harus preserve urutan descending dari fetch_and_rank, "
-        f"got scores: {scores}"
+        f"Endpoint harus preserve urutan descending dari fetch_and_rank, " f"got scores: {scores}"
     )
     assert papers[0]["paper_id"] == "p-high"
     assert papers[-1]["paper_id"] == "p-low"
@@ -943,4 +940,3 @@ async def test_relevance_sorted_descending() -> None:
     )
     assert 0.0 <= score_high <= 1.0, f"Score harus 0-1.0, got: {score_high}"
     assert 0.0 <= score_low <= 1.0, f"Score harus 0-1.0, got: {score_low}"
-

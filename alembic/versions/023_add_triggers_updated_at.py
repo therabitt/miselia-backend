@@ -59,7 +59,8 @@ def upgrade() -> None:
     # ── Buat trigger function ─────────────────────────────────────────────
     # Satu function digunakan oleh semua trigger — lebih efisien dari satu
     # function per tabel.
-    op.execute("""
+    op.execute(
+        """
         CREATE OR REPLACE FUNCTION set_updated_at()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -67,23 +68,28 @@ def upgrade() -> None:
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql
-    """)
+    """
+    )
 
     # ── Attach trigger ke setiap tabel ────────────────────────────────────
     for table in TABLES_WITH_UPDATED_AT:
-        op.execute(f"""
+        op.execute(
+            f"""
             CREATE TRIGGER trg_{table}_updated_at
             BEFORE UPDATE ON {table}
             FOR EACH ROW
             EXECUTE FUNCTION set_updated_at()
-        """)
+        """
+        )
 
 
 def downgrade() -> None:
     # Drop triggers dulu, kemudian drop function
     for table in TABLES_WITH_UPDATED_AT:
-        op.execute(f"""
+        op.execute(
+            f"""
             DROP TRIGGER IF EXISTS trg_{table}_updated_at ON {table}
-        """)
+        """
+        )
 
     op.execute("DROP FUNCTION IF EXISTS set_updated_at()")

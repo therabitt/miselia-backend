@@ -112,7 +112,7 @@ async def search(
     session_id: str | None = None
     if user is not None:
         session = await _save_search_session(
-            user_id=user.id,   # Gap F6-4: user.id (UUID PK), bukan supabase_id
+            user_id=user.id,  # Gap F6-4: user.id (UUID PK), bukan supabase_id
             query=query,
             filters=filters_dict,
             papers=raw_papers,

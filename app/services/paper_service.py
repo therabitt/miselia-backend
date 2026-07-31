@@ -62,13 +62,13 @@ logger = get_logger(__name__)
 # Ref: Blueprint §18.1, §18.2
 
 S2_RATE_KEY: str = "rate:semantic_scholar"
-S2_MAX_REQUESTS: int = 90       # 90 dari 100 sebagai safety buffer (Blueprint §18.2)
-S2_WINDOW_SECONDS: int = 300    # 5 menit sesuai S2 rate limit window
+S2_MAX_REQUESTS: int = 90  # 90 dari 100 sebagai safety buffer (Blueprint §18.2)
+S2_WINDOW_SECONDS: int = 300  # 5 menit sesuai S2 rate limit window
 
 # ── Konstanta Relevance Scoring ───────────────────────────────────────────
 # Tahun base untuk recency bonus — sesuai Blueprint §3.3
 _CURRENT_YEAR: int = 2026
-_RECENCY_WINDOW: int = 5        # paper dalam 5 tahun terakhir mendapat bonus
+_RECENCY_WINDOW: int = 5  # paper dalam 5 tahun terakhir mendapat bonus
 
 
 # ── Redis Client (lazy init, terpisah dari core/rate_limit.py) ───────────
@@ -167,9 +167,9 @@ def merge_and_dedup(
     Ref: Blueprint §3.3, §18.2, Gap P3-2, Gap P3-3
     """
     # ── Pass 1: Index S2 papers by DOI dan title_hash ──────────────────
-    doi_index: dict[str, dict[str, Any]] = {}       # doi → paper dict
-    hash_index: dict[str, dict[str, Any]] = {}      # title_hash → paper dict
-    merged: list[dict[str, Any]] = []               # hasil akhir
+    doi_index: dict[str, dict[str, Any]] = {}  # doi → paper dict
+    hash_index: dict[str, dict[str, Any]] = {}  # title_hash → paper dict
+    merged: list[dict[str, Any]] = []  # hasil akhir
 
     for paper in s2_papers:
         doi = paper.get("doi")
@@ -266,10 +266,30 @@ MIN_PAPERS_FOR_RUN: int = 5
 # Dipakai oleh should_run_query_translation() sebagai heuristic trigger.
 
 INDONESIAN_MARKERS: list[str] = [
-    "umkm", "bumdes", "kelurahan", "kecamatan", "desa", "kabupaten",
-    "provinsi", "daerah", "lokal", "nasional", "indonesia", "jawa",
-    "bali", "sumatera", "sulawesi", "kalimantan", "papua", "ntt", "nusa tenggara",
-    "batik", "wayang", "adat", "pesantren", "madrasah",
+    "umkm",
+    "bumdes",
+    "kelurahan",
+    "kecamatan",
+    "desa",
+    "kabupaten",
+    "provinsi",
+    "daerah",
+    "lokal",
+    "nasional",
+    "indonesia",
+    "jawa",
+    "bali",
+    "sumatera",
+    "sulawesi",
+    "kalimantan",
+    "papua",
+    "ntt",
+    "nusa tenggara",
+    "batik",
+    "wayang",
+    "adat",
+    "pesantren",
+    "madrasah",
 ]
 
 
@@ -283,21 +303,17 @@ INDONESIAN_CONCEPT_MAPPING: dict[str, list[str]] = {
     "bumdes": ["village enterprise", "rural cooperative", "community enterprise"],
     "pesantren": ["Islamic boarding school", "religious education institution"],
     "koperasi": ["cooperative", "credit union", "mutual organization"],
-
     # Konsep sosial-ekonomi
     "ketahanan pangan": ["food security", "food resilience"],
     "kemiskinan": ["poverty", "income inequality", "livelihood"],
     "pemberdayaan masyarakat": ["community empowerment", "social capital", "capacity building"],
     "otonomi daerah": ["regional autonomy", "decentralization", "local governance"],
-
     # Pendidikan
     "kurikulum merdeka": ["student-centered curriculum", "competency-based education"],
     "pembelajaran daring": ["online learning", "e-learning", "distance education"],
-
     # Pariwisata
     "wisata halal": ["halal tourism", "Muslim-friendly tourism"],
     "desa wisata": ["rural tourism", "village tourism", "agrotourism"],
-
     # Teknologi & digital
     "fintech syariah": ["Islamic fintech", "sharia-compliant financial technology"],
     "e-commerce lokal": ["local e-commerce", "digital marketplace", "platform economy"],
@@ -616,31 +632,33 @@ async def validate_paper_count(
     # Mutable default fix — jangan pakai {} sebagai default argument (Gap P4-7 style)
     safe_filters: dict[str, Any] = filters if filters is not None else {}
 
-    if len(papers) < MIN_PAPERS_FOR_RUN:
-        if stage_type in {"literature_review", "systematic_review"}:
-            augmented_queries = augment_query_with_mapping(topic)
-            logger.info(
-                "validate_paper_count_augmenting",
-                initial_count=len(papers),
-                stage_type=stage_type,
-                augmented_queries=augmented_queries[:2],
-            )
+    if len(papers) < MIN_PAPERS_FOR_RUN and stage_type in {
+        "literature_review",
+        "systematic_review",
+    }:
+        augmented_queries = augment_query_with_mapping(topic)
+        logger.info(
+            "validate_paper_count_augmenting",
+            initial_count=len(papers),
+            stage_type=stage_type,
+            augmented_queries=augmented_queries[:2],
+        )
 
-            additional = await fetch_papers_with_resilience(
-                optimized_queries=augmented_queries,
-                filters=safe_filters,
-                max_candidates=50,
-                pipeline="narrative",
-            )
+        additional = await fetch_papers_with_resilience(
+            optimized_queries=augmented_queries,
+            filters=safe_filters,
+            max_candidates=50,
+            pipeline="narrative",
+        )
 
-            # Dedup gabungan: papers awal + augmented results
-            papers = _dedup_single_list(papers + additional)
+        # Dedup gabungan: papers awal + augmented results
+        papers = _dedup_single_list(papers + additional)
 
-            logger.info(
-                "validate_paper_count_after_augment",
-                count_after=len(papers),
-                additional_found=len(additional),
-            )
+        logger.info(
+            "validate_paper_count_after_augment",
+            count_after=len(papers),
+            additional_found=len(additional),
+        )
 
     # Final check setelah augmentasi (atau tanpa augmentasi jika stage type lain)
     if len(papers) < MIN_PAPERS_FOR_RUN:
@@ -745,6 +763,7 @@ async def fetch_and_rank(
     )
 
     return papers
+
 
 # ── Core: Relevance Scoring ───────────────────────────────────────────────
 
@@ -919,14 +938,10 @@ async def fetch_papers_with_resilience(
     s2_included = False
 
     if s2_allowed:
-        coroutines.append(
-            fetch_from_semantic_scholar(optimized_queries, filters, max_candidates)
-        )
+        coroutines.append(fetch_from_semantic_scholar(optimized_queries, filters, max_candidates))
         s2_included = True
 
-    coroutines.append(
-        fetch_from_openalex(optimized_queries, filters, max_candidates)
-    )
+    coroutines.append(fetch_from_openalex(optimized_queries, filters, max_candidates))
 
     # ── Step 3: Parallel fetch ────────────────────────────────────────
     # return_exceptions=True: jika salah satu gagal, yang lain tetap jalan

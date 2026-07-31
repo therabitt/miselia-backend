@@ -87,10 +87,12 @@ def upgrade() -> None:
     # idx_search_sessions_user_created: composite — digunakan oleh
     # GET /papers/search-sessions yang selalu pakai WHERE user_id = ?
     # ORDER BY created_at DESC LIMIT 20
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_search_sessions_user_created
         ON search_sessions(user_id, created_at DESC)
-    """)
+    """
+    )
 
 
 def downgrade() -> None:

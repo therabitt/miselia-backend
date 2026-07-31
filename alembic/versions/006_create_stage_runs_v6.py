@@ -118,24 +118,30 @@ def upgrade() -> None:
     # Partial indexes — harus pakai raw SQL (Alembic tidak support WHERE di create_index)
     # idx_stage_runs_rerun_check: untuk query re-run limit Free tier (Decision #8)
     # Query: SELECT COUNT(*) FROM stage_runs WHERE user_id=? AND project_id=? AND stage_type=? AND status='completed'
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_stage_runs_rerun_check
         ON stage_runs(user_id, project_id, stage_type, status)
         WHERE status = 'completed'
-    """)
+    """
+    )
 
     # idx_stage_runs_project_status: untuk project overview dan staleness check
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_stage_runs_project_status
         ON stage_runs(project_id, stage_type, status)
-    """)
+    """
+    )
 
     # idx_stage_runs_celery_task: untuk orphaned task cleanup job (Blueprint §2.2 tasks.py)
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX idx_stage_runs_celery_task
         ON stage_runs(celery_task_id)
         WHERE celery_task_id IS NOT NULL
-    """)
+    """
+    )
 
 
 def downgrade() -> None:

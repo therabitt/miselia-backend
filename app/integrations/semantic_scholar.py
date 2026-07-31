@@ -200,9 +200,7 @@ def normalize_s2_papers(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # authors: list of {"name": "..."}
         authors_raw = paper.get("authors") or []
         authors: list[str] = [
-            a.get("name", "").strip()
-            for a in authors_raw
-            if a.get("name", "").strip()
+            a.get("name", "").strip() for a in authors_raw if a.get("name", "").strip()
         ]
 
         # venue: Gap S2-4 — bisa dari publicationVenue atau journal (object, bukan string)
