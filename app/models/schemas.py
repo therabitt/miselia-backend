@@ -10,12 +10,13 @@
 # Layer   : Models / Schemas
 # Deps    : pydantic, datetime
 # Step    : STEP 6 — Find Papers (schema awal)
-#           STEP berikutnya akan menambahkan: ProjectRequest/Response,
-#           StageRunRequest/Response, LibraryPaper, Chat, Subscription, dll.
-# Ref     : Blueprint §3.2 (FindPapers), §2.2
+#           Fase 2 STEP 2 — Auth, User, Preferences schemas
+# Ref     : Blueprint §3.2 (FindPapers), §2.2 (User/Auth)
 # ═══════════════════════════════════════════════════════════════════════════
 
 from __future__ import annotations
+
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -110,3 +111,177 @@ class SearchSessionResponse(BaseModel):
     filters: dict | None
     result_count: int
     created_at: str
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AUTH — Schemas
+# Ref: Blueprint §2.2, §3.1
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class AuthVerifyResponse(BaseModel):
+    """
+    Response body untuk POST /auth/verify.
+
+    Digunakan frontend untuk:
+      1. Routing: is_new_user=True OR onboarding_step < 4 → /onboarding
+      2. Menyimpan profil di state management (Zustand/Context)
+
+    is_new_user: True jika user baru dibuat (pertama kali login).
+    onboarding_step: 0–4 sesuai Blueprint §11.15.
+    """
+
+    user_id: str
+    email: str
+    full_name: Optional[str] = None
+    university: Optional[str] = None
+    field_of_study: Optional[str] = None
+    education_level: Optional[str] = None
+    email_verified: bool
+    onboarding_step: int
+    is_new_user: bool
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USER — Schemas
+# Ref: Blueprint §6.1, §11.15
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class UserProfileResponse(BaseModel):
+    """
+    Response body untuk GET /users/me dan PATCH /users/me.
+
+    id: UUID string internal Miselia (bukan Supabase ID).
+    onboarding_step: 0–4 (sesuai Blueprint §11.15 — 5 screens, 0=belum mulai, 4=selesai).
+    onboarding_completed_at: ISO 8601 string atau None jika belum selesai.
+    created_at: ISO 8601 string.
+    """
+
+    id: str
+    email: str
+    full_name: Optional[str] = None
+    university: Optional[str] = None
+    field_of_study: Optional[str] = None
+    education_level: Optional[str] = None
+    email_verified: bool
+    onboarding_step: int
+    onboarding_completed_at: Optional[str] = None
+    created_at: str
+
+
+class UserUpdateRequest(BaseModel):
+    """
+    Request body untuk PATCH /users/me.
+    Semua field optional — hanya field yang dikirim yang di-update.
+
+    Digunakan di setiap screen onboarding:
+      Screen 0 (full_name + university)
+      Screen 1 (education_level)
+      Screen 2 (field_of_study)
+      Screen 3 (onboarding_step ke 4 saat selesai)
+    """
+
+    full_name: Optional[str] = Field(
+        default=None,
+        max_length=255,
+        description="Nama lengkap user.",
+    )
+    university: Optional[str] = Field(
+        default=None,
+        max_length=255,
+        description="Nama universitas (string bebas, bukan FK).",
+    )
+    field_of_study: Optional[str] = Field(
+        default=None,
+        max_length=255,
+        description="Program studi.",
+    )
+    education_level: Optional[Literal["s1", "s2", "s3"]] = Field(
+        default=None,
+        description="Jenjang pendidikan: 's1', 's2', atau 's3'.",
+    )
+    onboarding_step: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=4,
+        description="Langkah onboarding saat ini (0–4).",
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# UNIVERSITY — Schemas
+# Ref: Blueprint §11.15 Screen 0 (autocomplete universitas)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class UniversityResult(BaseModel):
+    """
+    Satu entri universitas dalam response GET /users/universities.
+
+    citation_style: default citation style untuk universitas ini.
+    Digunakan sebagai initial value di Screen 3 onboarding (konfirmasi citation style).
+    """
+
+    id: str
+    name: str
+    city: str
+    province: str
+    type: str  # 'PTN' atau 'PTS'
+    citation_style: str  # 'apa7' | 'ieee' | 'vancouver' | ...
+
+
+class UniversityListResponse(BaseModel):
+    """
+    Response body untuk GET /users/universities.
+    """
+
+    universities: list[UniversityResult]
+    total: int
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USER PREFERENCES — Schemas
+# Ref: Blueprint §6.11, §11.15 Screen 3 (citation style)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class UserPreferencesResponse(BaseModel):
+    """
+    Response body untuk GET /users/preferences dan PATCH /users/preferences.
+
+    preferred_citation_style: None = auto-detect dari prodi (Blueprint Decision #9 chain).
+    ui_language: 'id' | 'en' — default 'id'.
+    email_notifications: True jika user mau terima email notifikasi.
+    updated_at: ISO 8601 string atau None.
+    """
+
+    preferred_citation_style: Optional[str] = None
+    ui_language: str
+    email_notifications: bool
+    updated_at: Optional[str] = None
+
+
+class UserPreferencesUpdate(BaseModel):
+    """
+    Request body untuk PATCH /users/preferences.
+    Semua field optional — hanya field yang dikirim yang di-update.
+
+    preferred_citation_style:
+      - Kirim string valid ('apa7', 'ieee', dll) untuk override.
+      - Skip field (tidak kirim) untuk tidak mengubah.
+      - Nilai valid: apa7, ieee, vancouver, chicago, harvard, mla, turabian.
+    """
+
+    preferred_citation_style: Optional[str] = Field(
+        default=None,
+        description="Citation style pilihan user. None = tidak diubah.",
+    )
+    ui_language: Optional[Literal["id", "en"]] = Field(
+        default=None,
+        description="Bahasa antarmuka: 'id' atau 'en'.",
+    )
+    email_notifications: Optional[bool] = Field(
+        default=None,
+        description="Aktifkan/nonaktifkan notifikasi email.",
+    )

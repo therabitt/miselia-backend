@@ -35,6 +35,8 @@ RATE_LIMITS = {
     "auth_find_papers": RateLimitRule("rl:auth:fp", max_requests=60),
     "pipeline_submit": RateLimitRule("rl:pipeline", max_requests=20),
     "chat_messages": RateLimitRule("rl:chat", max_requests=100),
+    # Fase 2: PATCH /users/me — cegah spam onboarding update
+    "auth_users_patch": RateLimitRule("rl:auth:users", max_requests=30),
 }
 
 # ── Redis client (lazy init) ─────────────────────────────────────────────
