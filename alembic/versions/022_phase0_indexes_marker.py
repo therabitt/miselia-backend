@@ -27,8 +27,12 @@
 #             017: idx_feature_flags_name
 #
 #           Index untuk tabel Fase 1+ (papers, search_sessions, library_papers,
-#           chat_sessions, chat_messages) akan dibuat bersama tabel tersebut.
+#           chat_sessions, chat_messages) sudah atau akan dibuat bersama tabel tersebut.
 #           Lihat Blueprint Appendix E untuk daftar lengkap.
+#
+#           [FIX Fase 2 STEP 1] down_revision diupdate dari "018" ke "019".
+#           Migration 019 (library_papers) disisipkan antara 018 dan 022.
+#           Migration 020 (chat_sessions) dan 021 (chat_messages) menyusul di fase chat.
 #
 #           Migration ini berfungsi sebagai PENANDA bahwa Fase 0 selesai
 #           dan seluruh index foundation sudah terpasang.
@@ -41,8 +45,9 @@
 from __future__ import annotations
 
 revision: str = "022"
-down_revision: str | None = "018"  # [CHAIN FIX Fase 1] diubah dari "017" ke "018"
-# Migration 018 (search_sessions) disisipkan antara 017 dan 022 di Fase 1 STEP 1.
+down_revision: str | None = "019"  # [CHAIN FIX Fase 2] diubah dari "018" ke "019"
+# Migration 019 (library_papers) disisipkan antara 018 dan 022 di Fase 2 STEP 1.
+# Migration 020/021 (chat_sessions/messages) akan disisipkan antara 019 dan 022 di fase chat.
 branch_labels: str | None = None
 depends_on: str | None = None
 

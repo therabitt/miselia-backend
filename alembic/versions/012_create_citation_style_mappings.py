@@ -4,8 +4,8 @@
 #           Seed data: 31 program studi (Blueprint Appendix F).
 #           Digunakan CitationStyleResolver priority chain step 4 (Decision #9).
 #
-#           Gap chain: down_revision = "010" (skip 011 — user_preferences Fase 2).
-#           Saat Fase 2 membuat 011, down_revision di sini diupdate ke "011".
+#           Chain: down_revision = "011" (user_preferences — dibuat Fase 2 STEP 1).
+#           [FIX Fase 2] Gap chain 010→012 sudah ditutup — 011 sekarang ada.
 #
 # Revision: 012
 # Fase    : Fase 0
@@ -20,7 +20,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 revision: str = "012"
-down_revision: str | None = "010"  # Gap: 011 dibuat Fase 2
+down_revision: str | None = "011"  # [FIX Fase 2] Gap ditutup — 011 sekarang ada
 branch_labels: str | None = None
 depends_on: str | None = None
 
