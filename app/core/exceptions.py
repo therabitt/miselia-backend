@@ -204,6 +204,14 @@ class LibraryQuotaExceededError(MiseliaBaseError):
     message = "Library sudah penuh. Upgrade untuk menyimpan lebih banyak paper."
 
 
+class LibraryDuplicateError(MiseliaBaseError):
+    """Paper sudah ada di library user — UNIQUE constraint (user_id, paper_id)."""
+
+    status_code = 409
+    error_code = "library_duplicate"
+    message = "Paper ini sudah ada di library kamu."
+
+
 # ── Import ────────────────────────────────────────────────────────────────
 
 
