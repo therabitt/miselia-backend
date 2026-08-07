@@ -11,7 +11,8 @@
 # Deps    : pydantic, datetime
 # Step    : STEP 6 — Find Papers (schema awal)
 #           Fase 2 STEP 2 — Auth, User, Preferences schemas
-# Ref     : Blueprint §3.2 (FindPapers), §2.2 (User/Auth)
+#           Fase 2 STEP 4 — Library schemas
+# Ref     : Blueprint §3.2 (FindPapers), §2.2 (User/Auth), §4.3 (Library)
 # ═══════════════════════════════════════════════════════════════════════════
 
 from __future__ import annotations
@@ -285,3 +286,157 @@ class UserPreferencesUpdate(BaseModel):
         default=None,
         description="Aktifkan/nonaktifkan notifikasi email.",
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LIBRARY — Schemas
+# Ref: Blueprint §4.3, §6.12, Decision #2, Decision #28
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class PaperInfo(BaseModel):
+    """
+    Metadata paper dari tabel 'papers' — nested di LibraryPaperResponse.
+
+    Semua field nullable karena paper dari import mungkin tidak punya
+    semua metadata (is_manually_imported=True, field bisa kosong).
+
+    Ref: Blueprint §6.5, §4.3
+    """
+
+    id: str
+    title: str
+    authors: Optional[list] = None      # JSONB dari DB — list of strings atau dicts
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    abstract: Optional[str] = None
+    doi: Optional[str] = None
+    pdf_url: Optional[str] = None
+    is_open_access: bool
+    citation_count: int
+    semantic_scholar_id: Optional[str] = None
+    openalex_id: Optional[str] = None
+
+
+class LibraryQuotaResponse(BaseModel):
+    """
+    Info kuota library user — disertakan di GET /library/papers response.
+
+    Frontend menggunakan ini untuk menampilkan progress bar quota
+    dan warning saat mendekati batas.
+
+    max_count=None artinya unlimited (Magister).
+    remaining=None artinya unlimited.
+
+    Ref: Blueprint Decision #28, §7.1 TIER_CONFIG.max_library_papers
+    """
+
+    current_count: int
+    max_count: Optional[int]    # None = unlimited (Magister)
+    remaining: Optional[int]    # None = unlimited
+    can_add_more: bool
+
+
+class LibraryPaperResponse(BaseModel):
+    """
+    Response body untuk satu library paper entry.
+
+    Digunakan oleh:
+      - GET  /library/papers/{library_paper_id}
+      - POST /library/papers (response setelah save)
+      - PATCH /library/papers/{library_paper_id}
+      - Item dalam LibraryPaperListResponse.papers[]
+
+    id          : UUID library_papers.id (bukan papers.id)
+    paper_info  : metadata paper dari tabel 'papers' (eager loaded)
+    source      : 'find_papers' | 'stage_run' (MVP)
+    notes       : catatan user, max 2000 char
+    tags        : tag user (sudah dinormalisasi: lowercase, strip)
+    expires_at  : ISO 8601 string atau None (None = permanent)
+    added_at    : ISO 8601 string
+
+    Ref: Blueprint §4.3, §6.12
+    """
+
+    id: str                             # library_papers.id
+    paper_info: PaperInfo
+    source: str                         # 'find_papers' | 'stage_run'
+    notes: Optional[str] = None
+    tags: Optional[list[str]] = None
+    is_incomplete: bool
+    expires_at: Optional[str] = None    # ISO 8601 atau None
+    added_at: str                       # ISO 8601
+
+
+class LibraryPaperCreate(BaseModel):
+    """
+    Request body untuk POST /library/papers.
+
+    paper_id          : UUID dari tabel 'papers' yang ingin disimpan.
+    source            : 'find_papers' (dari Find Papers hasil) atau
+                        'stage_run' (di-push dari pipeline result).
+    source_stage_run_id: wajib jika source='stage_run', None untuk 'find_papers'.
+
+    Validasi:
+    - source harus 'find_papers' atau 'stage_run' (MVP — Decision #12)
+    - source_stage_run_id required jika source='stage_run' (soft validation di service)
+
+    Ref: Blueprint §4.3, Decision #12
+    """
+
+    paper_id: str = Field(
+        description="UUID paper dari tabel 'papers' yang akan disimpan."
+    )
+    source: Literal["find_papers", "stage_run"] = Field(
+        default="find_papers",
+        description="Sumber paper: 'find_papers' atau 'stage_run'.",
+    )
+    source_stage_run_id: Optional[str] = Field(
+        default=None,
+        description="UUID stage run sumber. Wajib jika source='stage_run'.",
+    )
+
+
+class LibraryPaperUpdate(BaseModel):
+    """
+    Request body untuk PATCH /library/papers/{library_paper_id}.
+
+    Partial update — semua field optional.
+    Field yang tidak dikirim tidak berubah.
+
+    notes: max 2000 karakter. String kosong ('') akan di-set ke NULL.
+    tags : setelah normalisasi (strip+lower+dedup), max 10 item, max 30 char/item.
+           Kirim [] untuk menghapus semua tags.
+
+    Ref: Blueprint §2.2 G4, §4.3
+    """
+
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        description="Catatan user (max 2000 char). String kosong = hapus notes.",
+    )
+    tags: Optional[list[str]] = Field(
+        default=None,
+        description="Tag user. Dinormalisasi: lowercase+trim+dedup. Max 10, max 30 char/tag.",
+    )
+
+
+class LibraryPaperListResponse(BaseModel):
+    """
+    Response body untuk GET /library/papers.
+
+    papers : list LibraryPaperResponse, diurutkan added_at DESC
+    total  : total paper is_visible=TRUE milik user (sebelum pagination)
+    quota  : info kuota tier user — untuk progress bar dan warning di UI
+    limit  : page size yang digunakan
+    offset : offset yang digunakan
+
+    Ref: Blueprint §4.3, §H.5
+    """
+
+    papers: list[LibraryPaperResponse]
+    total: int
+    quota: LibraryQuotaResponse
+    limit: int
+    offset: int
