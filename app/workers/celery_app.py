@@ -8,7 +8,7 @@
 #             process_subscription_expiry : */15 * * * *   (Decision #1)
 #             send_renewal_notifications  : 0 1 * * *      (08:00 WIB)
 #             notify_library_expiry       : 0 2 * * *      (09:00 WIB)
-#             hard_delete_expired_papers  : 19 19 * * *    (02:00 WIB)
+#             hard_delete_expired_papers  : 0 19 * * *     (02:00 WIB)
 #             cleanup_orphaned_stage_runs : */30 * * * *   (setiap 30 menit)
 #             create_monthly_partition    : 5 17 1 * *     (00:05 WIB, tgl 1)
 #             check_pending_payments      : 0 */2 * * *    (setiap 2 jam)
