@@ -12,6 +12,7 @@
 # Step    : STEP 6 — Find Papers (schema awal)
 #           Fase 2 STEP 2 — Auth, User, Preferences schemas
 #           Fase 2 STEP 4 — Library schemas
+#           Fase 2 STEP 6 — Validator completeness pass
 # Ref     : Blueprint §3.2 (FindPapers), §2.2 (User/Auth), §4.3 (Library)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -19,7 +20,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ════════════════════════════════════════════════════════════════════════════
 # FIND PAPERS — Schemas
@@ -181,12 +182,18 @@ class UserUpdateRequest(BaseModel):
       Screen 1 (education_level)
       Screen 2 (field_of_study)
       Screen 3 (onboarding_step ke 4 saat selesai)
+
+    Validators (Fase 2 STEP 6):
+      full_name    : strip whitespace, empty string → None
+      field_of_study: strip whitespace, empty string → None
+      education_level: Literal['s1','s2','s3'] — validated by type
+      onboarding_step: ge=0, le=4 — validated by Field constraint
     """
 
     full_name: Optional[str] = Field(
         default=None,
         max_length=255,
-        description="Nama lengkap user.",
+        description="Nama lengkap user. Strip whitespace. Empty string = tidak diubah (None).",
     )
     university: Optional[str] = Field(
         default=None,
@@ -196,7 +203,7 @@ class UserUpdateRequest(BaseModel):
     field_of_study: Optional[str] = Field(
         default=None,
         max_length=255,
-        description="Program studi.",
+        description="Program studi. Strip whitespace. Empty string = tidak diubah (None).",
     )
     education_level: Optional[Literal["s1", "s2", "s3"]] = Field(
         default=None,
@@ -208,6 +215,23 @@ class UserUpdateRequest(BaseModel):
         le=4,
         description="Langkah onboarding saat ini (0–4).",
     )
+
+    @field_validator("full_name", "field_of_study", mode="before")
+    @classmethod
+    def strip_and_none_if_empty(cls, v: object) -> object:
+        """
+        Strip whitespace dari full_name dan field_of_study.
+        Jika hasil strip kosong, return None (dianggap tidak dikirim).
+
+        Contoh:
+          '  ' → None (whitespace only)
+          ' Budi Santoso ' → 'Budi Santoso'
+          None → None (tidak berubah)
+        """
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped if stripped else None
+        return v
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -263,20 +287,32 @@ class UserPreferencesResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
+# Nilai valid untuk preferred_citation_style — sesuai Blueprint §4 formatters
+_VALID_CITATION_STYLES = frozenset(
+    {"apa7", "ieee", "vancouver", "chicago", "harvard", "mla", "turabian"}
+)
+
+
 class UserPreferencesUpdate(BaseModel):
     """
     Request body untuk PATCH /users/preferences.
     Semua field optional — hanya field yang dikirim yang di-update.
 
     preferred_citation_style:
-      - Kirim string valid ('apa7', 'ieee', dll) untuk override.
+      - Kirim string valid untuk override pilihan citation style.
       - Skip field (tidak kirim) untuk tidak mengubah.
       - Nilai valid: apa7, ieee, vancouver, chicago, harvard, mla, turabian.
+      - Value lain akan ditolak dengan ValidationError 422.
+
+    ui_language: 'id' atau 'en' — validated by Literal type.
     """
 
     preferred_citation_style: Optional[str] = Field(
         default=None,
-        description="Citation style pilihan user. None = tidak diubah.",
+        description=(
+            "Citation style pilihan user. None = tidak diubah. "
+            "Nilai valid: apa7, ieee, vancouver, chicago, harvard, mla, turabian."
+        ),
     )
     ui_language: Optional[Literal["id", "en"]] = Field(
         default=None,
@@ -286,6 +322,25 @@ class UserPreferencesUpdate(BaseModel):
         default=None,
         description="Aktifkan/nonaktifkan notifikasi email.",
     )
+
+    @field_validator("preferred_citation_style", mode="before")
+    @classmethod
+    def validate_citation_style(cls, v: object) -> object:
+        """
+        Validasi preferred_citation_style terhadap allowlist.
+        Raise ValueError jika nilai tidak valid.
+
+        Nilai valid: apa7, ieee, vancouver, chicago, harvard, mla, turabian.
+        Ref: Blueprint §4 formatters, §7.1 TIER_CONFIG citation_style
+        """
+        if v is None:
+            return v
+        if isinstance(v, str) and v.strip().lower() in _VALID_CITATION_STYLES:
+            return v.strip().lower()
+        valid_list = ", ".join(sorted(_VALID_CITATION_STYLES))
+        raise ValueError(
+            f"Citation style tidak valid: '{v}'. Pilihan valid: {valid_list}."
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -414,12 +469,84 @@ class LibraryPaperUpdate(BaseModel):
     notes: Optional[str] = Field(
         default=None,
         max_length=2000,
-        description="Catatan user (max 2000 char). String kosong = hapus notes.",
+        description="Catatan user (max 2000 char). String kosong = hapus notes (set ke NULL).",
     )
     tags: Optional[list[str]] = Field(
         default=None,
-        description="Tag user. Dinormalisasi: lowercase+trim+dedup. Max 10, max 30 char/tag.",
+        description=(
+            "Tag user. Dinormalisasi: lowercase+trim+dedup. "
+            "Max 10 item, max 30 karakter per tag."
+        ),
     )
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def normalize_notes(cls, v: object) -> object:
+        """
+        Normalisasi notes:
+        - Strip whitespace leading/trailing
+        - String kosong ('') atau whitespace-only → None (hapus notes di DB)
+
+        Contoh:
+          '  Perlu dibaca ulang  ' → 'Perlu dibaca ulang'
+          '' → None
+          '   ' → None
+          None → None (tidak berubah)
+        """
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped if stripped else None
+        return v
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_tags(cls, v: object) -> object:
+        """
+        Normalisasi dan validasi tags:
+        1. Strip whitespace + lowercase tiap tag
+        2. Hapus tag kosong setelah strip
+        3. Deduplikasi (preserve order, keep first occurrence)
+        4. Validasi max 30 char per tag (setelah normalisasi)
+        5. Validasi max 10 item total (setelah dedup + hapus kosong)
+
+        Contoh:
+          ['  NLP ', 'nlp', 'Python', ''] → ['nlp', 'python']  (dedup + empty removed)
+          [] → []  (hapus semua tags)
+          None → None  (tidak berubah)
+
+        Raises:
+          ValueError: jika tag > 30 char atau total > 10 item
+
+        Ref: Blueprint §2.2 G4, §4.3
+        """
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            return v  # biarkan Pydantic type validator yang handle
+
+        # Normalisasi: strip + lowercase + hapus kosong
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for tag in v:
+            if not isinstance(tag, str):
+                continue
+            clean = tag.strip().lower()
+            if not clean:
+                continue  # hapus tag kosong
+            if len(clean) > 30:
+                raise ValueError(
+                    f"Tag '{clean[:30]}...' terlalu panjang — maksimum 30 karakter per tag."
+                )
+            if clean not in seen:
+                seen.add(clean)
+                normalized.append(clean)
+
+        if len(normalized) > 10:
+            raise ValueError(
+                f"Terlalu banyak tag: {len(normalized)} tag dikirim, maksimum 10 tag."
+            )
+
+        return normalized
 
 
 class LibraryPaperListResponse(BaseModel):
