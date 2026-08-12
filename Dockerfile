@@ -54,7 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Cairo — untuk WeasyPrint dan cairosvg
     libcairo2 \
     # GDK-PixBuf — image processing di WeasyPrint
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-2.0-0 \
     # FFI — C extension dependencies
     libffi-dev \
     # Font rendering (diperlukan WeasyPrint untuk render font di PDF)

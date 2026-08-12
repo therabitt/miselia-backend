@@ -13,6 +13,12 @@
 # Dibutuhkan karena FastAPI endpoints dan SQLAlchemy async session menggunakan async/await
 asyncio_mode = "auto"
 
+# Satu event loop untuk seluruh test session — WAJIB agar session-scoped async
+# fixtures (test_engine) compatible dengan function-scoped fixtures (db_connection).
+# Key ini tersedia di pytest-asyncio 0.25.x (bukan asyncio_loop_scope).
+# Ref: https://pytest-asyncio.readthedocs.io/en/stable/reference/configuration.html
+asyncio_default_fixture_loop_scope = "session"
+
 # Test discovery
 testpaths = ["tests"]
 python_files = ["test_*.py"]

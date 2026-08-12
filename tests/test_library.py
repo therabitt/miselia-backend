@@ -54,7 +54,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user
 from app.main import app
-from app.models.database import LibraryPaper, Paper
+from app.models.database import LibraryPaper, Paper, User
 
 # ── Konstanta test ────────────────────────────────────────────────────────
 
@@ -250,7 +250,8 @@ async def test_l03_save_paper_duplicate(
         resp = await authed_client.post(_LIBRARY_BASE_URL, json=payload)
 
     assert resp.status_code == 409, f"Expected 409, got {resp.status_code}: {resp.text}"
-    assert "detail" in resp.json()
+    body = resp.json()
+    assert body.get("error") == "library_duplicate"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -281,7 +282,8 @@ async def test_l04_save_paper_not_found(
         resp = await authed_client.post(_LIBRARY_BASE_URL, json=payload)
 
     assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
-    assert "detail" in resp.json()
+    body = resp.json()
+    assert body.get("error") == "paper_not_found"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -348,7 +350,8 @@ async def test_l06_get_paper_not_found(
     resp = await authed_client.get(url)
 
     assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
-    assert "detail" in resp.json()
+    body = resp.json()
+    assert body.get("error") == "library_paper_not_found"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -363,14 +366,24 @@ async def test_l07_get_paper_other_user(
     test_paper: Any,
 ) -> None:
     """
-    l07: GET /library/papers/{id} untuk paper milik user lain → 404.
+    l07: GET /library/papers/{id} untuk paper milik user lain → 403.
 
     Expected:
-    - 404 Not Found (tidak bocorkan existence — 404 bukan 403)
+    - 403 Forbidden (ForbiddenError — paper bukan milik user)
+    - Body: {"error": "forbidden", "message": "..."}
 
-    Buat LibraryPaper dengan user_id lain, GET sebagai test_user.
-    Ref: Blueprint §4.3 — security: jangan expose milik user lain
+    Ref: Blueprint §4.3 — GET /library/papers/{id}: 403 ForbiddenError jika bukan milik user
     """
+    # Buat other_user dulu agar FK constraint terpenuhi
+    other_user = User(
+        id=_OTHER_USER_UUID,
+        supabase_id=uuid.UUID("aaaaaaaa-0000-0000-0000-000000000002"),
+        email="other@test.com",
+        full_name="Other User",
+    )
+    db_session.add(other_user)
+    await db_session.flush()
+
     other_lp = LibraryPaper(
         id=uuid.UUID("40000000-0000-0000-0000-000000000002"),
         user_id=_OTHER_USER_UUID,
@@ -384,7 +397,9 @@ async def test_l07_get_paper_other_user(
     url = f"{_LIBRARY_BASE_URL}/{other_lp.id}"
     resp = await authed_client.get(url)
 
-    assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
+    assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert body["error"] == "forbidden"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -554,7 +569,8 @@ async def test_l12_delete_paper_not_found(
         resp = await authed_client.delete(url)
 
     assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
-    assert "detail" in resp.json()
+    body = resp.json()
+    assert body.get("error") == "library_paper_not_found"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

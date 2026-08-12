@@ -53,6 +53,7 @@ from app.core.exceptions import (
     LibraryDuplicateError,
     LibraryPaperNotFoundError,
     LibraryQuotaExceededError,
+    PaperNotFoundError,
 )
 from app.core.logging import get_logger
 from app.core.tier_config import (
@@ -60,17 +61,17 @@ from app.core.tier_config import (
     SubscriptionTier,
     get_tier_config,
 )
-from app.models.database import LibraryPaper, Subscription
+from app.models.database import LibraryPaper, Paper, Subscription
 
 log = get_logger(__name__)
 
 # ── Konstanta ─────────────────────────────────────────────────────────────
 
-_NOTES_MAX_CHARS = 2000        # Blueprint §2.2 PATCH /library/papers/{id}
-_TAGS_MAX_COUNT = 10           # Blueprint §2.2
-_TAGS_MAX_CHAR_PER_ITEM = 30   # Blueprint §2.2
-_FREE_EXPIRY_DAYS = 30         # Decision #2 — Free tier 30 hari aktif
-_RESTORE_WINDOW_DAYS = 90      # Decision #2 — window restore setelah expired
+_NOTES_MAX_CHARS = 2000  # Blueprint §2.2 PATCH /library/papers/{id}
+_TAGS_MAX_COUNT = 10  # Blueprint §2.2
+_TAGS_MAX_CHAR_PER_ITEM = 30  # Blueprint §2.2
+_FREE_EXPIRY_DAYS = 30  # Decision #2 — Free tier 30 hari aktif
+_RESTORE_WINDOW_DAYS = 90  # Decision #2 — window restore setelah expired
 
 # Source yang valid untuk MVP Library (Decision #12)
 # csv_import/bib_import/ris_import ditambahkan di Fase 5 (Decision #28)
@@ -208,11 +209,7 @@ async def get_library_papers(
         # Hanya paper yang memiliki SEMUA tag yang diminta
         normalized_tags = [t.strip().lower() for t in tags if t.strip()]
         if normalized_tags:
-            conditions.append(
-                LibraryPaper.tags.contains(
-                    cast(normalized_tags, PG_ARRAY(SAText))
-                )
-            )
+            conditions.append(LibraryPaper.tags.contains(cast(normalized_tags, PG_ARRAY(SAText))))
 
     result = await db.execute(
         select(LibraryPaper)
@@ -257,8 +254,7 @@ async def add_paper_to_library(
     """
     if source not in _VALID_MVP_SOURCES:
         raise ValueError(
-            f"source '{source}' tidak valid di Fase 2. "
-            f"Gunakan: {sorted(_VALID_MVP_SOURCES)}"
+            f"source '{source}' tidak valid di Fase 2. " f"Gunakan: {sorted(_VALID_MVP_SOURCES)}"
         )
 
     if source == "stage_run" and source_stage_run_id is None:
@@ -294,6 +290,13 @@ async def add_paper_to_library(
 
     if existing_id is not None:
         raise LibraryDuplicateError()
+
+    # Validasi paper_id existence di tabel papers
+    # Mencegah FK IntegrityError (500) saat paper_id tidak ada.
+    # Ref: Blueprint §4.3 POST /library/papers
+    paper_exists = await db.execute(select(Paper.id).where(Paper.id == paper_id))
+    if paper_exists.scalar_one_or_none() is None:
+        raise PaperNotFoundError(message=f"Paper dengan id {paper_id} tidak ditemukan.")
 
     # Hitung expires_at berdasarkan tier
     now = datetime.now(UTC)
@@ -395,9 +398,7 @@ async def update_library_paper(
     Ref: Blueprint §2.2, §4.2 PATCH /library/papers/{id}
     """
     # Ambil paper dan cek ownership sekaligus
-    result = await db.execute(
-        select(LibraryPaper).where(LibraryPaper.id == library_paper_id)
-    )
+    result = await db.execute(select(LibraryPaper).where(LibraryPaper.id == library_paper_id))
     library_paper = result.scalar_one_or_none()
 
     if library_paper is None:
@@ -456,9 +457,7 @@ async def remove_paper_from_library(
 
     Ref: Blueprint §4.2, §12.3, Decision #2
     """
-    result = await db.execute(
-        select(LibraryPaper).where(LibraryPaper.id == library_paper_id)
-    )
+    result = await db.execute(select(LibraryPaper).where(LibraryPaper.id == library_paper_id))
     library_paper = result.scalar_one_or_none()
 
     if library_paper is None:

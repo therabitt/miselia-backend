@@ -62,6 +62,35 @@ from app.core.exceptions import RateLimitExceededError
 VALID_QUERY = "pengaruh media sosial terhadap motivasi belajar mahasiswa"
 
 
+# ── Module-level fixture: isolasi rate limit dari Redis ──────────────────────
+#
+# Masalah: saat Redis running, counter rate limit terakumulasi lintas test.
+# Setelah 10 request ke /api/v1/papers/find, semua test berikutnya kena 429.
+#
+# Solusi: mock check_rate_limit sebagai no-op untuk SEMUA test di modul ini.
+# test_find_papers_rate_limit_guest (T05) menggunakan monkeypatch.setattr yang
+# di-apply SETELAH autouse fixture → override ke mock counter-nya sendiri.
+# Tidak ada konflik. Ref: pytest fixture order — autouse < test-level monkeypatch.
+
+
+@pytest.fixture(autouse=True)
+def noop_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Mock check_rate_limit → no-op untuk semua test di modul ini.
+
+    Mencegah Redis counter dari test sebelumnya mempengaruhi test berikutnya.
+    test_find_papers_rate_limit_guest (T05) override ini via monkeypatch.setattr
+    ke mock counter sendiri — tidak konflik.
+
+    Ref: Blueprint §2.2 RATE_LIMITS — ditest secara eksplisit di T05.
+    """
+
+    async def _noop(limit_name: str, identifier: str) -> None:
+        return None
+
+    monkeypatch.setattr("app.api.v1.find_papers.check_rate_limit", _noop)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -557,16 +586,20 @@ async def test_cache_hit_faster() -> None:
 @pytest.mark.unit
 async def test_dedup_no_duplicate_doi() -> None:
     """
-    Mock get_cached_or_fetch mengembalikan papers dengan DOI duplikat.
-    fetch_and_rank real (melalui merge_and_dedup) harus membuang duplikat.
+    Mock get_cached_or_fetch + fetch_papers_with_resilience agar dedup berjalan.
+    fetch_and_rank melalui _dedup_single_list harus membuang duplikat DOI.
     Response tidak boleh mengandung DOI yang sama 2×.
+
+    CATATAN: _dedup_single_list dipanggil dalam cold start augmentation path.
+    Kita pastikan cold start trigger (papers < threshold) dan additional papers
+    mengandung duplikat sehingga dedup aktif.
 
     Ref: Blueprint §14.0 (_dedup_papers)
     """
     from app.main import app
 
-    # Raw papers: 2 entri dengan DOI sama dari sumber berbeda
-    papers_with_dup = [
+    # 1 paper awal dari cache → cold start akan trigger (< min threshold)
+    papers_initial = [
         {
             "paper_id": "s2-001",
             "title": "Paper A dari Semantic Scholar",
@@ -580,6 +613,10 @@ async def test_dedup_no_duplicate_doi() -> None:
             "pdf_url": None,
             "is_open_access": True,
         },
+    ]
+
+    # Additional papers dari cold start augment — termasuk duplikat DOI
+    papers_additional = [
         {
             "paper_id": "oa-001",
             "title": "Paper A dari OpenAlex",
@@ -589,7 +626,7 @@ async def test_dedup_no_duplicate_doi() -> None:
             "citation_count": 45,
             "abstract": "Abstrak paper A dari OA.",
             "source": "openalex",
-            "doi": "10.1234/duplicate-doi",  # ← DOI duplikat
+            "doi": "10.1234/duplicate-doi",  # ← DOI duplikat dengan s2-001
             "pdf_url": None,
             "is_open_access": True,
         },
@@ -612,10 +649,17 @@ async def test_dedup_no_duplicate_doi() -> None:
 
     try:
         async with client:
-            with patch(
-                "app.services.paper_service.get_cached_or_fetch",
-                new_callable=AsyncMock,
-                return_value=papers_with_dup,
+            with (
+                patch(
+                    "app.services.paper_service.get_cached_or_fetch",
+                    new_callable=AsyncMock,
+                    return_value=papers_initial,
+                ),
+                patch(
+                    "app.services.paper_service.fetch_papers_with_resilience",
+                    new_callable=AsyncMock,
+                    return_value=papers_additional,
+                ),
             ):
                 resp = await client.post(
                     "/api/v1/papers/find",

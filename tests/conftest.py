@@ -32,11 +32,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import asyncpg
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -98,12 +100,68 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """
+    Hook: tambahkan loop_scope="session" ke semua async test function.
+
+    WAJIB untuk pytest-asyncio 0.25.x:
+      - asyncio_default_fixture_loop_scope="session" (pyproject.toml) → fixtures
+        menggunakan session event loop.
+      - Tapi test FUNCTIONS masih menggunakan function-scoped loop secara default.
+      - Tidak ada ini option untuk mengubah ini di 0.25.x — harus via marker.
+
+    Hook ini secara otomatis menambahkan @pytest.mark.asyncio(loop_scope="session")
+    ke setiap async test, sehingga test + fixtures semua share satu session loop.
+    Ini mencegah:
+        RuntimeError: Task got Future attached to a different loop
+
+    Ref: pytest-asyncio docs — Event loop scope for tests
+    """
+    asyncio_session_mark = pytest.mark.asyncio(loop_scope="session")
+    for item in items:
+        if isinstance(item, pytest.Function) and asyncio.iscoroutinefunction(
+            getattr(item, "function", None)
+        ):
+            item.add_marker(asyncio_session_mark, append=False)
+
+
 @pytest_asyncio.fixture(scope="session")
 async def test_engine() -> AsyncGenerator[Any, None]:
     """
     Buat async engine untuk test database.
     Scope: session — engine dibuat sekali, dibuang di akhir session.
+
+    Auto-create 'miselia_test' jika belum ada:
+    - Koneksi ke maintenance DB 'postgres' via asyncpg
+    - CREATE DATABASE ... IF NOT EXISTS (menggunakan exist-check manual)
+    - Setelah DB ada, buat semua tabel via Base.metadata.create_all
+
+    CATATAN: create_all tidak menjalankan Alembic migration.
+    Untuk tabel partitioned (analytics_events), gunakan alembic.command.upgrade().
+    Ref: Blueprint §2.2, §6.1
     """
+    # ── Step 1: Auto-create DB test jika belum ada ───────────────────────
+    # Ambil DSN asyncpg (tanpa asyncpg+postgresql:// prefix) dari TEST_DATABASE_URL
+    # TEST_DATABASE_URL = 'postgresql+asyncpg://user:pass@host:port/miselia_test'
+    # asyncpg.connect() butuh: 'postgresql://user:pass@host:port/postgres'
+    maintenance_dsn = TEST_DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+    # Ganti nama DB ke 'postgres' (maintenance DB — selalu ada)
+    if "/" in maintenance_dsn:
+        base_dsn, _ = maintenance_dsn.rsplit("/", 1)
+        maintenance_dsn = f"{base_dsn}/postgres"
+
+    conn_raw: asyncpg.Connection = await asyncpg.connect(dsn=maintenance_dsn)
+    try:
+        db_exists = await conn_raw.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", "miselia_test"
+        )
+        if not db_exists:
+            # CREATE DATABASE tidak bisa dalam transaction — gunakan execute langsung
+            await conn_raw.execute("CREATE DATABASE miselia_test OWNER postgres")
+    finally:
+        await conn_raw.close()
+
+    # ── Step 2: Buat engine dan semua tabel ──────────────────────────────
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,  # Matikan SQL logging di test
@@ -112,10 +170,6 @@ async def test_engine() -> AsyncGenerator[Any, None]:
         max_overflow=10,
     )
 
-    # Buat semua tabel via ORM Base.metadata
-    # CATATAN: Ini tidak menjalankan Alembic migration (tidak ada partisi analytics_events)
-    # Untuk Fase 0, ini cukup karena test masih kosong.
-    # Saat Fase berikutnya butuh tabel partitioned, gunakan alembic.command.upgrade().
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -129,36 +183,58 @@ async def test_engine() -> AsyncGenerator[Any, None]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Function-scoped: Transaction rollback per test
-# Setiap test berjalan dalam nested transaction yang di-rollback setelah selesai
+# Function-scoped: DB connection + session — isolation via fresh engine per test
+#
+# DESAIN:
+#   test_engine (session-scoped) hanya digunakan untuk:
+#     - Auto-create database miselia_test
+#     - Base.metadata.create_all (setup tabel)
+#     - Base.metadata.drop_all (teardown tabel)
+#
+#   db_connection (function-scoped) membuat AsyncEngine BARU per test dengan
+#   pool_size=1. Ini memastikan:
+#     1. Tidak ada pool sharing antar test → tidak ada InterfaceError
+#     2. Setiap test punya connection lifecycle sendiri (BEGIN → test → ROLLBACK)
+#     3. Tidak bergantung pada session event loop → tidak ada loop conflict
+#
+#   Isolation: rollback setelah setiap test — DB kembali ke state sebelum test.
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 @pytest_asyncio.fixture
 async def db_connection(test_engine: Any) -> AsyncGenerator[AsyncConnection, None]:
     """
-    Buka koneksi DB dan mulai transaction untuk satu test.
-    Scope: function — per test.
+    Buat AsyncEngine BARU per test (pool_size=1) untuk isolasi penuh.
+
+    Parameter test_engine hanya sebagai dependency order: memastikan tabel sudah
+    dibuat sebelum test berjalan. Koneksi aktual menggunakan engine baru agar
+    tidak ada pool sharing dengan test lain.
+
+    Rollback otomatis setelah test selesai → data kembali ke state awal.
     """
-    async with test_engine.connect() as conn:
-        await conn.begin()
-        yield conn
-        await conn.rollback()
+    # Engine baru per test — tidak share pool dengan test_engine atau test lain
+    fresh_engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        pool_size=1,  # Satu connection per test — tidak perlu lebih
+        max_overflow=0,  # Tidak ada overflow — strict isolation
+        pool_pre_ping=False,
+    )
+    try:
+        async with fresh_engine.connect() as conn:
+            await conn.begin()
+            yield conn
+            await conn.rollback()
+    finally:
+        await fresh_engine.dispose()
 
 
 @pytest_asyncio.fixture
 async def db_session(db_connection: AsyncConnection) -> AsyncGenerator[AsyncSession, None]:
     """
-    AsyncSession yang ter-bind ke db_connection.
+    AsyncSession yang ter-bind ke db_connection (function-scoped fresh engine).
     Setiap test mendapat session baru — di-rollback setelah test selesai.
     Digunakan sebagai pengganti get_db() dependency di test.
-
-    Penggunaan:
-        async def test_something(db_session: AsyncSession):
-            user = User(...)
-            db_session.add(user)
-            await db_session.flush()
-            # Tidak perlu commit — di-rollback otomatis
     """
     session_factory = async_sessionmaker(
         bind=db_connection,

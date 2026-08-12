@@ -196,6 +196,19 @@ class LibraryPaperNotFoundError(MiseliaBaseError):
     message = "Paper tidak ditemukan di library."
 
 
+class PaperNotFoundError(MiseliaBaseError):
+    """Paper dengan ID yang diberikan tidak ditemukan di tabel papers.
+
+    Digunakan saat menyimpan paper ke library namun paper_id tidak exist.
+    Mencegah FK IntegrityError propagate sebagai 500.
+    Ref: Blueprint §4.3 POST /library/papers — validasi paper_id existence.
+    """
+
+    status_code = 404
+    error_code = "paper_not_found"
+    message = "Paper tidak ditemukan."
+
+
 class LibraryQuotaExceededError(MiseliaBaseError):
     """Library sudah penuh sesuai batas tier. Decision #28"""
 

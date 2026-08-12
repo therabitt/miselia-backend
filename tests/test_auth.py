@@ -195,7 +195,9 @@ async def test_a03_auth_verify_no_token(
     assert resp.status_code == 401, f"Expected 401, got {resp.status_code}: {resp.text}"
 
     body = resp.json()
-    assert "detail" in body
+    # Miselia custom exception → {"error": "unauthorized", "message": "..."}
+    # Bukan FastAPI default {"detail": "..."}
+    assert body.get("error") == "unauthorized", f"Expected error=unauthorized, got: {body}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
